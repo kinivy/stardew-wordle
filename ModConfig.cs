@@ -1,4 +1,4 @@
-namespace GrassBomb
+namespace StardewWordle
 {
     public class ModConfig
     {

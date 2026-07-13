@@ -8,7 +8,7 @@ using Microsoft.Xna.Framework.Graphics;
 using System.Data.Common;
 using System.Runtime.CompilerServices;
 
-namespace GrassBomb
+namespace StardewWordle
 {
     public class ModEntry : Mod
     {
