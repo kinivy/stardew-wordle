@@ -16,6 +16,7 @@ using StardewValley.ItemTypeDefinitions;
 using StardewValley.Objects;
 using StardewValley.Tools;
 using xTile;
+using StardewModdingAPI.Utilities;
 
 
 namespace StardewWordle
@@ -23,24 +24,31 @@ namespace StardewWordle
     public class TestMenu : IClickableMenu
     {
         private ClickableTextureComponent okButton;
-        private ClickableComponent testLabel;
+        private IMonitor Monitor;
         private String wordOfDay;
         private IModHelper helper;
         public static int menuWidth = 650 + borderWidth * 2;
         public static int menuHeight = 700 + borderWidth * 2 + Game1.tileSize;
         private Rectangle[] GridRectangles;
         private Dictionary<char, Rectangle> KeyboardMap;
+        private ModData model;
 
         
-        public TestMenu(IModHelper helper) :  base((int)getAppropriateMenuPosition().X, (int)getAppropriateMenuPosition().Y, menuWidth , menuHeight)
+        public TestMenu(IModHelper helper, IMonitor monitor) :  base((int)getAppropriateMenuPosition().X, (int)getAppropriateMenuPosition().Y, menuWidth , menuHeight)
         {
             this.helper = helper;
             this.wordOfDay = getWordOfDay();
+            this.Monitor = monitor;
+
+            this.model = this.helper.Data.ReadGlobalData<ModData>("wordle-data");
 
             this.GridRectangles = initGrid();
             this.KeyboardMap = initKeyboard();
 
-            testLabel = (new ClickableComponent(new Rectangle(this.xPositionOnScreen + Game1.tileSize / 4 + spaceToClearSideBorder + borderWidth + Game1.tileSize * 3 + 8, this.yPositionOnScreen + borderWidth + spaceToClearTopBorder - Game1.tileSize / 8, 20, 5), wordOfDay));
+            Monitor.Log(getWordOfDay(), LogLevel.Debug);
+
+            Game1.keyboardDispatcher.Subscriber = new TextBox(null,null,Game1.smallFont,Color.Black);
+
             this.okButton = new ClickableTextureComponent("OK", new Rectangle(this.xPositionOnScreen + this.width - borderWidth - spaceToClearSideBorder - Game1.tileSize, this.yPositionOnScreen + this.height - borderWidth - spaceToClearTopBorder + Game1.tileSize / 4, Game1.tileSize, Game1.tileSize), "", null, Game1.mouseCursors, Game1.getSourceRectForStandardTileSheet(Game1.mouseCursors, 46), 1f);
         }
 
@@ -84,43 +92,179 @@ namespace StardewWordle
         {
             Vector2 defaultPosition = new Vector2(Game1.viewport.Width / 2 - menuWidth / 2, (Game1.viewport.Height / 2 - menuHeight / 2));
 
-            //Force the viewport into a position that it should fit into on the screen???
             if (defaultPosition.X + menuWidth > Game1.viewport.Width)
             {
                 defaultPosition.X = 0;
             }
-
             if (defaultPosition.Y + menuHeight > Game1.viewport.Height)
             {
                 defaultPosition.Y = 0;
             }
             return defaultPosition;
+        }
 
+        private void inputLetter(String key)
+        {
+            if (model.Guesses[model.Guesses.Count-1].Length == 5)
+            {
+                return;
+            } 
+            else
+            {
+                model.Guesses[model.Guesses.Count-1] += key;
+            }
+            this.helper.Data.WriteGlobalData("wordle-data", model);
+        }
+
+        private void removeLetter()
+        {
+            String guess = model.Guesses[model.Guesses.Count-1];
+            if(guess.Length > 0)
+            {
+                model.Guesses[model.Guesses.Count-1]= model.Guesses[model.Guesses.Count-1][..^1];
+                this.helper.Data.WriteGlobalData("wordle-data", model);
+            }
+        }
+
+        private void submitGuess()
+        {
+            String lastGuess = model.Guesses[model.Guesses.Count() - 1];
+            Monitor.Log("Guess: " + lastGuess, LogLevel.Debug);
+            if(lastGuess.Length == 5)
+            {
+                if (model.PossibleGuesses.Contains(lastGuess.ToLower()))
+                {
+                    model.Guesses.Add("");
+                    this.helper.Data.WriteGlobalData("wordle-data", model);
+                } else
+                {
+                    Monitor.Log("Not in word bank.", LogLevel.Debug);
+                    // not in word Bank
+                }
+            }             
+        }
+
+        public override void receiveKeyPress(Keys key)
+        {
+            Monitor.Log(key.ToString());
+            if (key != Keys.None && key.ToString().Length == 1 && "ZXCVBNMASDFGHJKLQWERTYUIOP".Contains(key.ToString()))
+            {
+                inputLetter(key.ToString());
+            }
+            if(key == Keys.Escape)
+            {
+                exitThisMenu();
+            }
+
+            if(key == Keys.Back)
+            {
+                removeLetter();
+            }
+
+            if(key == Keys.Enter)
+            {
+                submitGuess();
+            }
         }
 
         public override void draw(SpriteBatch b)
         {
             base.draw(b);
             Game1.drawDialogueBox(this.xPositionOnScreen, this.yPositionOnScreen, this.width, this.height, false, true);
-            Utility.drawTextWithShadow(b, "Word of Day:" + testLabel.name, Game1.smallFont, new Vector2(testLabel.bounds.X, testLabel.bounds.Y), Game1.textColor);
             okButton.draw(b);
 
-            foreach(Rectangle square in this.GridRectangles)
+            for(int i = 0; i < GridRectangles.Length; i++)
             {
-                Utility.DrawSquare(b, square, 2, Color.White, Color.White);
+                Rectangle square = GridRectangles[i];
+                if( model.Guesses.Count() > i / 5)
+                {
+                    String guess = model.Guesses[ i / 5];
+                    if(guess.Length > i % 5)
+                    {
+                        String letter = guess[i % 5].ToString();
+                        Color bgColor = i / 5 != model.Guesses.Count-1 ? DetermineGridBgColor(letter.ToLower(), i % 5) : Color.White;
+                        Utility.DrawSquare(b, square, 2, bgColor, bgColor);
+                        Utility.drawBoldText(b, letter, Game1.dialogueFont, new Vector2(square.X, square.Y), Game1.textColor);
+                    } else
+                    {
+                        Utility.DrawSquare(b, square, 2, Color.White, Color.White);
+                    }
+                } else
+                {
+                    Utility.DrawSquare(b, square, 2, Color.White, Color.White);
+                }
             }
 
             foreach( char key in this.KeyboardMap.Keys)
             {
+                Color bgColor = DetermineKeyBgColor(key);
                 Rectangle rect = KeyboardMap.GetValueOrDefault(key);
-                Utility.DrawSquare(b, rect ,2, Color.White, Color.White);
+                Utility.DrawSquare(b, rect ,2, bgColor, bgColor);
                 Utility.drawBoldText(b, key.ToString(), Game1.dialogueFont, new Vector2(rect.X, rect.Y), Game1.textColor);
             }
             drawMouse(b);
         }
+
+        private Color DetermineGridBgColor(String letter, int index)
+        {
+            String correctWord = getWordOfDay();
+            if (correctWord.IndexOf(letter) != -1)
+            {
+                for( int i = correctWord.IndexOf(letter); i < correctWord.Length; i++)
+                {
+                    if(correctWord[i].ToString() == letter && i == index)
+                    {
+                        return Color.Green;
+                    }
+                }
+                
+                return Color.Yellow;
+            } else
+            {
+                return Color.White;
+            }
+        }
+
+        private Color DetermineKeyBgColor(char key)
+        {
+            String correctWord = getWordOfDay();
+            Color returnColor = Color.White;
+
+            for(int i = 0; i < model.Guesses.Count; i++)
+            {
+                String guess = model.Guesses[i];
+                for(int j = 0; j < guess.Length;  j++)
+                {
+                    if(guess[j] == key)
+                    {                        
+                        if(guess[j] == correctWord[j])
+                        {
+                            return Color.Green;
+                        } else if(correctWord.Contains(guess[j].ToString()))
+                        {
+                            returnColor = Color.Yellow;
+                        }
+                    }
+                }
+            }
+            return returnColor;
+        }
+
+        private int[] getAllIndices(String target, String letter)
+        {
+            List<int> indices = new List<int>();
+            for(int i = 0; i < target.Length; i++)
+            {
+                if (target[i].ToString().Equals(letter))
+                {
+                    indices.Add(i);
+                }
+            }
+            return indices.ToArray();
+        }
+
         private string getWordOfDay()
         {
-            var model = this.helper.Data.ReadGlobalData<ModData>("wordle-data");
             if(model != null)
             {
                 return model.WordOfDay;

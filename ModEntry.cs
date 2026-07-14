@@ -7,7 +7,9 @@ using StardewValley.GameData.Shops;
 using Microsoft.Xna.Framework.Graphics;
 using System.Data.Common;
 using System.Runtime.CompilerServices;
-\
+using System.Collections;
+using System.Resources;
+
 namespace StardewWordle
 {
     public class ModEntry : Mod
@@ -28,14 +30,13 @@ namespace StardewWordle
         {
             if( e.Button.Equals(SButton.Y))
             {
-                Game1.activeClickableMenu = new TestMenu(this.Helper);
+                Game1.activeClickableMenu = new TestMenu(this.Helper, this.Monitor);
             }
         }
 
 
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
         {
-            
             setWordOfDay();
         }
 
@@ -59,7 +60,7 @@ namespace StardewWordle
         private void initializeWordleData()
         {
             var model = this.Helper.Data.ReadGlobalData<ModData>("wordle-data");
-
+            model = null;
             if(model == null){
                 model = new ModData();
                 var rand = new Random();
@@ -81,6 +82,8 @@ namespace StardewWordle
             int index = (int) (rand.NextDouble() * (words.Length-1));
 
             model.WordOfDay = words[index];
+            model.Guesses = new List<String>([""]);
+            
             this.Helper.Data.WriteGlobalData("wordle-data", model);
         }
     }
@@ -90,5 +93,6 @@ namespace StardewWordle
         public String WordOfDay {get; set;}
         public String[] PossibleGuesses {get; set;}
         public String[] PossibleWords {get; set;}
+        public List<String> Guesses {get; set;}
     }
 }
