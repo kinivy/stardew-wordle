@@ -21,8 +21,7 @@ namespace StardewWordle
         private ModData model;
         private TimeSpan gridAnimStart = TimeSpan.Zero;
         private int gridAnimCount = -1;
-        private WordleState state = WordleState.PLAYING;
-        private  static TimeSpan GRID_ANIM_INTERVAL = TimeSpan.FromMilliseconds(300);
+        private static TimeSpan GRID_ANIM_INTERVAL = TimeSpan.FromMilliseconds(300);
         private static Color YELLOW = new Color(196, 173, 85);
         private static Color GREEN = new Color(103, 168, 92);
         private static Color GRAY = new Color(120, 124, 128);
@@ -37,13 +36,6 @@ namespace StardewWordle
 
             this.GridRectangles = initGrid();
             this.KeyboardMap = initKeyboard();
-
-            if(this.model.Guesses.Last().EqualsIgnoreCase(getWordOfDay())) {
-                this.state = WordleState.PLAYING;
-            } else if(this.model.Guesses.Count() == 5)
-            {
-                this.state = WordleState.LOST;
-            }
 
             Monitor.Log(getWordOfDay(), LogLevel.Debug);
 
@@ -184,16 +176,16 @@ namespace StardewWordle
                     gridAnimCount = 0;
                     if (lastGuess.EqualsIgnoreCase(getWordOfDay()))
                     {
-                        this.state = WordleState.WON;
+                        model.State = WordleState.WON;
                     } else if(model.Guesses.Count() == 5)
                     {
-                        this.state = WordleState.LOST;
+                        model.State = WordleState.LOST;
                     }
                     else
                     {
                         model.Guesses.Add(""); // Start new guess
-                        this.helper.Data.WriteGlobalData("wordle-data", model);
                     }
+                    this.helper.Data.WriteGlobalData("wordle-data", model);
                 } else
                 {
                     // not in word Bank
@@ -377,17 +369,17 @@ namespace StardewWordle
 
         private bool inWinState()
         {
-            return this.state == WordleState.WON;
+            return model.State == WordleState.WON;
         }
 
         private bool inPlayingState()
         {
-            return this.state == WordleState.PLAYING;
+            return model.State == WordleState.PLAYING;
         }
 
         private bool InLoseState()
         {
-            return this.state == WordleState.LOST;
+            return model.State == WordleState.LOST;
         }
 
         private int[] getAllIndices(String target, char letter)
@@ -410,13 +402,6 @@ namespace StardewWordle
                 return model.WordOfDay;
             }
             return "";
-        }
-
-        public enum WordleState
-        {
-            WON,
-            LOST,
-            PLAYING
         }
     }
 }

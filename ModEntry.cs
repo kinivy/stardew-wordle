@@ -81,6 +81,7 @@ namespace StardewWordle
             model.WordOfDay = words[index];
             model.Guesses = new List<String>([""]);
             model.Colors = new Color[5,5];
+            model.State = WordleState.PLAYING;
             
             this.Helper.Data.WriteGlobalData("wordle-data", model);
         }
@@ -93,5 +94,12 @@ namespace StardewWordle
         public String[] PossibleWords {get; set;}
         public List<String> Guesses {get; set;}
         public Color[,] Colors {get; set;}
+        public WordleState State {get; set;}
+    }
+    public enum WordleState
+        {
+        WON,
+        LOST,
+        PLAYING
     }
 }
