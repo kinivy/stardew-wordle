@@ -23,6 +23,10 @@ namespace StardewWordle
         private int animCount = -1;
         private TimeSpan animInterval = TimeSpan.FromMilliseconds(300);
         private bool inWinState = false;
+        private Color YELLOW = new Color(196, 173, 85);
+        private Color GREEN = new Color(103, 168, 92);
+        private Color GRAY = new Color(120, 124, 128);
+        private Color LIGHTGRAY = new Color(211, 214, 219);
 
         
         public TestMenu(IModHelper helper, IMonitor monitor) :  base((int)getAppropriateMenuPosition().X, (int)getAppropriateMenuPosition().Y, menuWidth , menuHeight)
@@ -259,7 +263,7 @@ namespace StardewWordle
                         }
                     }
                     Utility.DrawSquare(b, square, 2, bgColor, bgColor);
-                    Utility.drawBoldText(b, letter, Game1.dialogueFont, new Vector2(square.X, square.Y), Game1.textColor);
+                    Utility.drawBoldText(b, letter, Game1.dialogueFont, new Vector2(square.X, square.Y), bgColor == Color.White ? Color.Black : Color.White);
                 } else
                 {
                     Utility.DrawSquare(b, square, 2, Color.White, Color.White);
@@ -273,7 +277,7 @@ namespace StardewWordle
                     Color bgColor = DetermineKeyBgColor(key);
                     Rectangle rect = KeyboardMap.GetValueOrDefault(key);
                     Utility.DrawSquare(b, rect ,2, bgColor, bgColor);
-                    Utility.drawBoldText(b, key.ToString(), Game1.dialogueFont, new Vector2(rect.X, rect.Y), Game1.textColor);
+                    Utility.drawBoldText(b, key.ToString(), Game1.dialogueFont, new Vector2(rect.X, rect.Y), bgColor == LIGHTGRAY ? Color.Black : Color.White);
                 }
             }
 
@@ -283,37 +287,36 @@ namespace StardewWordle
         private Color[] DetermineGridBgColor(String guess)
         {
             String correctWord = getWordOfDay().ToUpper();
-            Color[] colors = [Color.Gray,Color.Gray,Color.Gray,Color.Gray,Color.Gray];
+            Color[] colors = [GRAY,GRAY,GRAY,GRAY,GRAY];
             
+            Dictionary<char,int> remainingCounts = new Dictionary<char, int>();
+            for(int i = 0; i < correctWord.Length; i++ )
+            {
+                if(remainingCounts.ContainsKey(correctWord[i]))
+                {
+                    remainingCounts[correctWord[i]] = remainingCounts[correctWord[i]] + 1;
+                } else
+                {   
+                    remainingCounts[correctWord[i]] = 1;
+                }
+            }
+
             for(int i = 0; i < guess.Length; i++)
             {
                 if(guess[i] == correctWord[i])
                 {
                     Monitor.Log("Matched " + guess[i], LogLevel.Debug);
-                    colors[i] = Color.Green;
+                    colors[i] = GREEN;
+                    remainingCounts[guess[i]]--;
                 }
             }
 
-            Dictionary<char,int> remainingCounts = new Dictionary<char, int>();
-            for(int i = 0; i < guess.Length; i++ )
-            {
-                if(guess[i] != correctWord[i] && correctWord.Contains(guess[i]))
-                {
-                    if(remainingCounts.ContainsKey(guess[i]))
-                    {
-                        remainingCounts[guess[i]] = remainingCounts[guess[i]] + 1;
-                    } else
-                    {   
-                        remainingCounts[guess[i]] = 1;
-                    }
-                }
-            }
 
             for(int i = 0; i < guess.Length; i++)
             {
-                if(guess[i] != correctWord[i] && correctWord.Contains(guess[i]) && remainingCounts[guess[i]] != 0)
+                if(guess[i] != correctWord[i] && correctWord.Contains(guess[i]) && remainingCounts[guess[i]] > 0)
                 {
-                    colors[i] = Color.Yellow;
+                    colors[i] = YELLOW;
                     remainingCounts[guess[i]]--;
                 }
             }
@@ -323,7 +326,7 @@ namespace StardewWordle
         private Color DetermineKeyBgColor(char key)
         {
             String correctWord = getWordOfDay().ToUpper();
-            Color returnColor = Color.White;
+            Color returnColor = LIGHTGRAY;
 
             for(int i = 0; i < model.Guesses.Count - 1; i++)
             {
@@ -338,13 +341,13 @@ namespace StardewWordle
                     {                        
                         if(guess[j] == correctWord[j])
                         {
-                            return Color.Green;
+                            return GREEN;
                         } else if(correctWord.Contains(guess[j].ToString()))
                         {
-                            returnColor = Color.Yellow;
+                            returnColor = YELLOW;
                         } else
                         {
-                            returnColor = Color.Gray;
+                            returnColor = GRAY;
                         }
                     }
                 }
