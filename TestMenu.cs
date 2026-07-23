@@ -19,14 +19,14 @@ namespace StardewWordle
         private Rectangle[] GridRectangles;
         private Dictionary<char, Rectangle> KeyboardMap;
         private ModData model;
-        private TimeSpan animStart = TimeSpan.Zero;
-        private int animCount = -1;
-        private TimeSpan animInterval = TimeSpan.FromMilliseconds(300);
-        private bool inWinState = false;
-        private Color YELLOW = new Color(196, 173, 85);
-        private Color GREEN = new Color(103, 168, 92);
-        private Color GRAY = new Color(120, 124, 128);
-        private Color LIGHTGRAY = new Color(211, 214, 219);
+        private TimeSpan gridAnimStart = TimeSpan.Zero;
+        private int gridAnimCount = -1;
+        private WordleState state = WordleState.PLAYING;
+        private  static TimeSpan GRID_ANIM_INTERVAL = TimeSpan.FromMilliseconds(300);
+        private static Color YELLOW = new Color(196, 173, 85);
+        private static Color GREEN = new Color(103, 168, 92);
+        private static Color GRAY = new Color(120, 124, 128);
+        private static Color LIGHTGRAY = new Color(211, 214, 219);
 
         
         public TestMenu(IModHelper helper, IMonitor monitor) :  base((int)getAppropriateMenuPosition().X, (int)getAppropriateMenuPosition().Y, menuWidth , menuHeight)
@@ -39,7 +39,10 @@ namespace StardewWordle
             this.KeyboardMap = initKeyboard();
 
             if(this.model.Guesses.Last().EqualsIgnoreCase(getWordOfDay())) {
-                this.inWinState = true;
+                this.state = WordleState.PLAYING;
+            } else if(this.model.Guesses.Count() == 5)
+            {
+                this.state = WordleState.LOST;
             }
 
             Monitor.Log(getWordOfDay(), LogLevel.Debug);
@@ -68,7 +71,7 @@ namespace StardewWordle
         {
             Dictionary<char, Rectangle> map = new Dictionary<char, Rectangle>();
             string[] rows = [ "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM" ];
-            int width = Game1.tileSize * 5 / 8;
+            int width = Game1.tileSize * 6 / 8;
             int margin = 4;
             for(int i = 0; i < rows.Length; i++)
             {
@@ -87,27 +90,30 @@ namespace StardewWordle
 
         public override void update(GameTime gameTime)
         {
-            if(animCount == 0 && animStart == TimeSpan.Zero)
+            if(gridAnimCount == 0 && gridAnimStart == TimeSpan.Zero)
             {
-                animStart = gameTime.TotalGameTime;
-            } else if ( animStart + 5 * animInterval < gameTime.TotalGameTime)
+                gridAnimStart = gameTime.TotalGameTime;
+            } else if ( gridAnimStart + 5 * GRID_ANIM_INTERVAL < gameTime.TotalGameTime)
             {
-                animCount = -1;
-                animStart = TimeSpan.Zero;
+                gridAnimCount = -1;
+                gridAnimStart = TimeSpan.Zero;
                 return;
             }
 
-            if(animCount != -1)
+            if(gridAnimCount != -1)
             {
                 for(int i = 0; i < 5; i++)
                 {
-                    if (gameTime.TotalGameTime > animStart + ( i * animInterval ) && i > animCount)
+                    if (gameTime.TotalGameTime > gridAnimStart + ( i * GRID_ANIM_INTERVAL ) && i > gridAnimCount)
                     {
-                        animCount = i;
-                        if(i == 4 && inWinState)
+                        gridAnimCount = i;
+                        if(i == 4 && inWinState())
                         {
                             Game1.playSound("powerup", null);
-                        } else
+                        } else if (i == 4 && InLoseState()) {
+                            Game1.playSound("death", null);   
+                        }
+                        else
                         {
                             Game1.playSound("machine_bell", null);
                         }
@@ -120,8 +126,8 @@ namespace StardewWordle
         public new void exitThisMenu(bool playSound = true)
         {
             base.exitThisMenu(playSound);
-            this.animCount = -1;
-            this.animStart = TimeSpan.Zero;
+            this.gridAnimCount = -1;
+            this.gridAnimStart = TimeSpan.Zero;
         }
 
         public static Vector2 getAppropriateMenuPosition()
@@ -164,7 +170,7 @@ namespace StardewWordle
 
         private void submitGuess()
         {
-            if(animCount != -1)
+            if(gridAnimCount != -1)
             {
                 return;
             }
@@ -175,11 +181,15 @@ namespace StardewWordle
                 {
                     Game1.playSound("crit", null);
                     updateColors();       
-                    animCount = 0;
+                    gridAnimCount = 0;
                     if (lastGuess.EqualsIgnoreCase(getWordOfDay()))
                     {
-                        this.inWinState = true;
-                    } else
+                        this.state = WordleState.WON;
+                    } else if(model.Guesses.Count() == 5)
+                    {
+                        this.state = WordleState.LOST;
+                    }
+                    else
                     {
                         model.Guesses.Add(""); // Start new guess
                         this.helper.Data.WriteGlobalData("wordle-data", model);
@@ -188,7 +198,7 @@ namespace StardewWordle
                 {
                     // not in word Bank
                     Monitor.Log("Not in word bank.", LogLevel.Debug);
-                    Game1.playSound("treethud", null);
+                    Game1.playSound("fishEscape", null);
                 }
             }   
         }
@@ -206,7 +216,7 @@ namespace StardewWordle
 
         public override void receiveKeyPress(Keys key)
         {
-            if (!inWinState)
+            if (inPlayingState())
             {     
                 if (key != Keys.None && key.ToString().Length == 1 && "ZXCVBNMASDFGHJKLQWERTYUIOP".Contains(key.ToString()))
                 {
@@ -251,33 +261,43 @@ namespace StardewWordle
                     String guess = model.Guesses[ i / 5];
                     String letter = guess[i % 5].ToString();
                     Color bgColor = Color.White;
-                    if(inWinState || (!inWinState && i / 5 != model.Guesses.Count-1))
+                    if(!inPlayingState() || (inPlayingState() && i / 5 != model.Guesses.Count-1))
                     {
                         bgColor = model.Colors[i / 5, i % 5];
                     }
-                    if (animCount != -1 && i / 5 == model.Guesses.Count - (inWinState ? 1 : 2))
+                    if (gridAnimCount != -1 && i / 5 == model.Guesses.Count - (inPlayingState() ? 2 : 1))
                     {
-                        if(i % 5 > animCount)
+                        if(i % 5 > gridAnimCount)
                         {
                             bgColor = Color.White;
                         }
                     }
                     Utility.DrawSquare(b, square, 2, bgColor, bgColor);
-                    Utility.drawBoldText(b, letter, Game1.dialogueFont, new Vector2(square.X, square.Y), bgColor == Color.White ? Color.Black : Color.White);
+                    Vector2 letterSize = Game1.dialogueFont.MeasureString(letter);
+                    Vector2 letterPos = new Vector2(
+                        square.X + (square.Width - letterSize.X) / 2f,
+                        square.Y + (square.Height - letterSize.Y) / 2f
+                    );
+                    Utility.drawBoldText(b, letter, Game1.dialogueFont, letterPos, bgColor == Color.White ? Color.Black : Color.White);
                 } else
                 {
                     Utility.DrawSquare(b, square, 2, Color.White, Color.White);
                 }
             }
 
-            if (!( inWinState && animCount == -1))
+            if ( inPlayingState() || (!inPlayingState() && gridAnimCount != -1))
             {    
                 foreach(char key in this.KeyboardMap.Keys)
                 {
                     Color bgColor = DetermineKeyBgColor(key);
                     Rectangle rect = KeyboardMap.GetValueOrDefault(key);
-                    Utility.DrawSquare(b, rect ,2, bgColor, bgColor);
-                    Utility.drawBoldText(b, key.ToString(), Game1.dialogueFont, new Vector2(rect.X, rect.Y), bgColor == LIGHTGRAY ? Color.Black : Color.White);
+                    Utility.DrawSquare(b, rect, 2, bgColor, bgColor);
+                    Vector2 letterSize = Game1.smallFont.MeasureString(key.ToString());
+                    Vector2 letterPos = new Vector2(
+                        rect.X + (rect.Width - letterSize.X) / 2f,
+                        rect.Y + (rect.Height - letterSize.Y) / 2f
+                    );
+                    Utility.drawBoldText(b, key.ToString(), Game1.smallFont, letterPos, bgColor == LIGHTGRAY ? Color.Black : Color.White);
                 }
             }
 
@@ -333,7 +353,7 @@ namespace StardewWordle
                 String guess = model.Guesses[i];
                 for(int j = 0; j < guess.Length;  j++)
                 {
-                    if(animCount != -1 && j > animCount)
+                    if(i == model.Guesses.Count - (inPlayingState() ? 2 : 1) && gridAnimCount != -1 && j > gridAnimCount)
                     {
                         continue;
                     }
@@ -353,6 +373,21 @@ namespace StardewWordle
                 }
             }
             return returnColor;
+        }
+
+        private bool inWinState()
+        {
+            return this.state == WordleState.WON;
+        }
+
+        private bool inPlayingState()
+        {
+            return this.state == WordleState.PLAYING;
+        }
+
+        private bool InLoseState()
+        {
+            return this.state == WordleState.LOST;
         }
 
         private int[] getAllIndices(String target, char letter)
@@ -375,6 +410,13 @@ namespace StardewWordle
                 return model.WordOfDay;
             }
             return "";
+        }
+
+        public enum WordleState
+        {
+            WON,
+            LOST,
+            PLAYING
         }
     }
 }
