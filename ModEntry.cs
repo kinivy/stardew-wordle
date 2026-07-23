@@ -2,13 +2,8 @@ using HarmonyLib;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
-using StardewValley.GameData.Objects;
-using StardewValley.GameData.Shops;
-using Microsoft.Xna.Framework.Graphics;
-using System.Data.Common;
-using System.Runtime.CompilerServices;
-using System.Collections;
-using System.Resources;
+using Microsoft.Xna.Framework;
+using GrassBomb;
 
 namespace StardewWordle
 {
@@ -24,6 +19,8 @@ namespace StardewWordle
             helper.Events.Input.ButtonPressed += OnButtonClick;
 
             var harmony = new Harmony(this.ModManifest.UniqueID);
+
+            CodePatches.Initialize(this.Monitor, harmony);
         }
 
         private void OnButtonClick(object? sender, ButtonPressedEventArgs e)
@@ -37,7 +34,7 @@ namespace StardewWordle
 
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
         {
-            setWordOfDay();
+            initModel();
         }
 
 
@@ -74,7 +71,7 @@ namespace StardewWordle
             this.Helper.Data.WriteGlobalData("wordle-data", model);
         }
 
-        private void setWordOfDay()
+        private void initModel()
         {
             var model = this.Helper.Data.ReadGlobalData<ModData>("wordle-data");
             string[] words = model.PossibleWords;
@@ -83,6 +80,7 @@ namespace StardewWordle
 
             model.WordOfDay = words[index];
             model.Guesses = new List<String>([""]);
+            model.Colors = new Color[5,5];
             
             this.Helper.Data.WriteGlobalData("wordle-data", model);
         }
@@ -94,5 +92,6 @@ namespace StardewWordle
         public String[] PossibleGuesses {get; set;}
         public String[] PossibleWords {get; set;}
         public List<String> Guesses {get; set;}
+        public Color[,] Colors {get; set;}
     }
 }
