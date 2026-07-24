@@ -26,7 +26,6 @@ namespace StardewWordle
         private static Color GREEN = new Color(103, 168, 92);
         private static Color GRAY = new Color(120, 124, 128);
         private static Color LIGHTGRAY = new Color(211, 214, 219);
-
         
         public TestMenu(IModHelper helper, IMonitor monitor) :  base((int)getAppropriateMenuPosition().X, (int)getAppropriateMenuPosition().Y, menuWidth , menuHeight)
         {
@@ -40,8 +39,6 @@ namespace StardewWordle
             Monitor.Log(getWordOfDay(), LogLevel.Debug);
 
             Game1.keyboardDispatcher.Subscriber = new TextBox(null,null,Game1.smallFont,Color.Black);
-
-            this.okButton = new ClickableTextureComponent("OK", new Rectangle(this.xPositionOnScreen + this.width - borderWidth - spaceToClearSideBorder - Game1.tileSize, this.yPositionOnScreen + this.height - borderWidth - spaceToClearTopBorder + Game1.tileSize / 4, Game1.tileSize, Game1.tileSize), "", null, Game1.mouseCursors, Game1.getSourceRectForStandardTileSheet(Game1.mouseCursors, 46), 1f);
         }
 
         private Rectangle[] initGrid()
@@ -53,7 +50,7 @@ namespace StardewWordle
             for( int i = 0; i < 25; i++ )
             {
                 int xPos = rowStartX + (i % 5) * width + (i % 5 * margin);
-                int yPos = this.yPositionOnScreen + borderWidth + spaceToClearTopBorder + (width * 2) + (((i / 5)-1) * margin) + (((i / 5)-1) * width);
+                int yPos = this.yPositionOnScreen + borderWidth + spaceToClearTopBorder + (width * 1) + (((i / 5)-1) * margin) + (((i / 5)-1) * width);
                 grid[i] = new Rectangle(xPos, yPos, width, width);
             }
             return grid;
@@ -64,6 +61,7 @@ namespace StardewWordle
             Dictionary<char, Rectangle> map = new Dictionary<char, Rectangle>();
             string[] rows = [ "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM" ];
             int width = Game1.tileSize * 6 / 8;
+            int height = width * 3 / 2;
             int margin = 4;
             for(int i = 0; i < rows.Length; i++)
             {
@@ -73,8 +71,9 @@ namespace StardewWordle
                 for(int j = 0; j < row.Length; j++)
                 {
                     int xPos = rowStartX + (j * width) + (j * margin);
-                    int yPos = this.yPositionOnScreen + (height - (width * 5)) + (i * width) + (i * margin);                    
-                    map.Add(row[j], new Rectangle(xPos, yPos, width, width));
+                    int yPos = this.yPositionOnScreen + (this.height - ( height * 4)) + (i * height) + (i * margin);
+                    
+                    map.Add(row[j], new Rectangle(xPos, yPos, width, height));
                 }
             }
             return map;
@@ -117,9 +116,9 @@ namespace StardewWordle
 
         public new void exitThisMenu(bool playSound = true)
         {
-            base.exitThisMenu(playSound);
             this.gridAnimCount = -1;
             this.gridAnimStart = TimeSpan.Zero;
+            base.exitThisMenu(playSound);
         }
 
         public static Vector2 getAppropriateMenuPosition()
@@ -177,6 +176,12 @@ namespace StardewWordle
                     if (lastGuess.EqualsIgnoreCase(getWordOfDay()))
                     {
                         model.State = WordleState.WON;
+                        model.TotalWins++;
+                        model.Streak++;
+                        model.LastWinDate = Game1.dayOfMonth + " " + Game1.season.ToString() + " " + Game1.year;
+                        Monitor.Log("Total Wins: " + model.TotalWins, LogLevel.Debug);
+                        Monitor.Log("Streak: " + model.Streak, LogLevel.Debug);
+                        Monitor.Log("Last Win Date: " + model.LastWinDate, LogLevel.Debug);
                     } else if(model.Guesses.Count() == 5)
                     {
                         model.State = WordleState.LOST;
@@ -206,6 +211,22 @@ namespace StardewWordle
             this.helper.Data.WriteGlobalData("wordle-data", model);
         }
 
+        public override void receiveLeftClick(int x, int y, bool playSound = true)
+        {
+            base.receiveLeftClick(x, y, playSound);
+            if(inPlayingState())
+            {
+                foreach(char key in KeyboardMap.Keys)
+                {
+                    if (KeyboardMap[key].Contains(x, y))
+                    {
+                        inputLetter(key.ToString());
+                        Game1.playSound("smallSelect", null);
+                    }
+                }
+            }
+        }
+
         public override void receiveKeyPress(Keys key)
         {
             if (inPlayingState())
@@ -226,25 +247,19 @@ namespace StardewWordle
                 {
                     submitGuess();
                 }
-            } else {
-                if(key == Keys.Enter)
+
+                if(key == Keys.Escape)
                 {
                     exitThisMenu();
                 }
-            }
-
-            if(key == Keys.Escape)
-            {
+            } else {
                 exitThisMenu();
             }
+
         }
 
-        public override void draw(SpriteBatch b)
+        public void drawGrid(SpriteBatch b)
         {
-            base.draw(b);
-            Game1.drawDialogueBox(this.xPositionOnScreen, this.yPositionOnScreen, this.width, this.height, false, true);
-            okButton.draw(b);
-
             for(int i = 0; i < GridRectangles.Length; i++)
             {
                 Rectangle square = GridRectangles[i];
@@ -264,7 +279,7 @@ namespace StardewWordle
                             bgColor = Color.White;
                         }
                     }
-                    Utility.DrawSquare(b, square, 2, bgColor, bgColor);
+                    Utility.DrawSquare(b, square, 4, bgColor == Color.White ? GRAY : bgColor, bgColor);
                     Vector2 letterSize = Game1.dialogueFont.MeasureString(letter);
                     Vector2 letterPos = new Vector2(
                         square.X + (square.Width - letterSize.X) / 2f,
@@ -273,26 +288,83 @@ namespace StardewWordle
                     Utility.drawBoldText(b, letter, Game1.dialogueFont, letterPos, bgColor == Color.White ? Color.Black : Color.White);
                 } else
                 {
-                    Utility.DrawSquare(b, square, 2, Color.White, Color.White);
+                    Utility.DrawSquare(b, square, 4, LIGHTGRAY, Color.White);
                 }
             }
+        }
 
+        private void drawKeyboard(SpriteBatch b)
+        {
+            foreach(char key in this.KeyboardMap.Keys)
+            {
+                Color bgColor = DetermineKeyBgColor(key);
+                Rectangle rect = KeyboardMap.GetValueOrDefault(key);
+                Utility.DrawSquare(b, rect, 2, bgColor, bgColor);
+                String letter = key.ToString();
+                Vector2 letterSize = Game1.smallFont.MeasureString(letter);
+                Vector2 letterPos = new Vector2(
+                    rect.X + (rect.Width - letterSize.X) / 2f,
+                    rect.Y + (rect.Height - letterSize.Y) / 2f
+                );
+                Utility.drawBoldText(b, letter, Game1.smallFont, letterPos, bgColor == LIGHTGRAY ? Color.Black : Color.White);
+            }
+        }
+
+        public void drawBoxAndHeader(SpriteBatch b)
+        {
+            Rectangle box = new Rectangle(this.xPositionOnScreen, this.yPositionOnScreen, this.width, this.height);
+            Utility.DrawSquare(b, box, 12, GRAY, Color.White);
+
+            Vector2 headerSize = Game1.dialogueFont.MeasureString("WORDLE");
+            Vector2 headerPos = new Vector2(
+                this.xPositionOnScreen + (this.width - headerSize.X * 1.5f) / 2f,
+                this.yPositionOnScreen + borderWidth + 10
+            );
+            Utility.drawBoldText(b,"WORDLE",Game1.dialogueFont,headerPos,Color.Black,1.5f);
+        }
+
+        public void drawStats(SpriteBatch b )
+        {
+            String totalWinsText = "Total Wins:\t" + model.TotalWins;
+            String streakText = "Streak:\t" + model.Streak;
+            String rewardText = "Reward:\t???";
+            int margin = 12;
+            Vector2 totalWinsSize = Game1.dialogueFont.MeasureString(totalWinsText);
+            Vector2 totalWinsPos = new Vector2(
+                this.xPositionOnScreen + (this.width - totalWinsSize.X) / 2f,
+                this.yPositionOnScreen + borderWidth + (this.height - 4*totalWinsSize.Y) - margin
+            );
+
+            Vector2 streakSize = Game1.dialogueFont.MeasureString(streakText);
+            Vector2 streakPos = new Vector2(
+                this.xPositionOnScreen + (this.width - streakSize.X) / 2f,
+                this.yPositionOnScreen + borderWidth + (this.height - 3*streakSize.Y) - margin
+            );
+
+            Vector2 rewardSize = Game1.dialogueFont.MeasureString(totalWinsText);
+            Vector2 rewardPos = new Vector2(
+                this.xPositionOnScreen + (this.width - rewardSize.X) / 2f,
+                this.yPositionOnScreen + borderWidth + (this.height - 2*rewardSize.Y) - margin
+            );
+
+            Utility.drawBoldText(b,totalWinsText,Game1.dialogueFont,totalWinsPos,Color.Black);
+            Utility.drawBoldText(b,streakText,Game1.dialogueFont,streakPos,Color.Black);
+            Utility.drawBoldText(b,rewardText,Game1.dialogueFont,rewardPos,Color.Black);
+        }
+
+        public override void draw(SpriteBatch b)
+        {
+            base.draw(b);
+            //Game1.drawDialogueBox(this.xPositionOnScreen, this.yPositionOnScreen, this.width, this.height, false, true);
+            drawBoxAndHeader(b);
+            drawGrid(b);
             if ( inPlayingState() || (!inPlayingState() && gridAnimCount != -1))
             {    
-                foreach(char key in this.KeyboardMap.Keys)
-                {
-                    Color bgColor = DetermineKeyBgColor(key);
-                    Rectangle rect = KeyboardMap.GetValueOrDefault(key);
-                    Utility.DrawSquare(b, rect, 2, bgColor, bgColor);
-                    Vector2 letterSize = Game1.smallFont.MeasureString(key.ToString());
-                    Vector2 letterPos = new Vector2(
-                        rect.X + (rect.Width - letterSize.X) / 2f,
-                        rect.Y + (rect.Height - letterSize.Y) / 2f
-                    );
-                    Utility.drawBoldText(b, key.ToString(), Game1.smallFont, letterPos, bgColor == LIGHTGRAY ? Color.Black : Color.White);
-                }
+                drawKeyboard(b);
+            } else if(!inPlayingState() && gridAnimCount == -1)
+            {
+                drawStats(b);
             }
-
             drawMouse(b);
         }
 
