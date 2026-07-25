@@ -16,9 +16,9 @@ namespace StardewWordle
         public override void Entry(IModHelper helper)
         {
             Config = helper.ReadConfig<ModConfig>();
-            
             helper.Events.GameLoop.GameLaunched += OnGameLaunched;
             helper.Events.GameLoop.DayStarted += OnDayStarted;
+            helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.Content.AssetRequested += OnAssetRequested;
 
             var harmony = new Harmony(this.ModManifest.UniqueID);
@@ -56,15 +56,27 @@ namespace StardewWordle
 
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
         {
-            initModel();
-            checkIfWordleStreakBroke();
+            if(Game1.dayOfMonth % 7 == 1)
+            {
+                checkIfWordleStreakBroke();
+                weeklyReset();
+            }
+        }
+
+        private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
+        {
+            var saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
+            if(saveModel == null)
+            {
+                weeklyReset();
+            }
+            CodePatches.HasWonThisWeek = saveModel.HasWonThisWeek;
         }
 
 
         private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
         {
-
-            initializeWordleData();
+            initializeWordleDictionaryData();
 
             var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
             if (configMenu is null)
@@ -79,101 +91,77 @@ namespace StardewWordle
 
         private void checkIfWordleStreakBroke()
         {
-            var model = this.Helper.Data.ReadGlobalData<ModData>("wordle-data");
-            if (String.IsNullOrEmpty(model.LastWinDate)) { return; }
-            String[] split = model.LastWinDate.Split(" ");
-            int day = Int32.Parse(split[0]);
-            String season = split[1];
-            int year = Int32.Parse(split[2]);
-            
-            if(season.Equals(Game1.season.ToString()) 
-                && year == Game1.year
-                && day != Game1.dayOfMonth -1)
+            var saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
+            if(saveModel.Streak > 0 && saveModel.State != WordleState.WON)
             {
-                Monitor.Log("Same season & year, lost streak.", LogLevel.Debug);
-                model.Streak = 0;
-                model.LastWinDate = "";
+                saveModel.Streak = 0;
+                this.Helper.Data.WriteSaveData("wordle-save-data", saveModel);
+                Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
             }
-
-            if(Game1.dayOfMonth == 1 
-                && year == Game1.year
-                && oneSeasonAhead(season)
-                && day != 28)
-            {
-                Monitor.Log("Same year, one season ahead, lost streak.", LogLevel.Debug);
-                model.LastWinDate = "";
-                model.Streak = 0;
-            }
-
-            if(Game1.dayOfMonth == 1 
-                && Game1.season == Season.Spring
-                && year == Game1.year - 1
-                && season == "Winter"
-                && day != 28)
-            {
-                Monitor.Log("New year transfer, lost streak.", LogLevel.Debug);
-                model.LastWinDate = "";
-                model.Streak = 0;
-            }
-            this.Helper.Data.WriteGlobalData("wordle-data", model);
         }
 
-        private bool oneSeasonAhead(String season)
+        private void initializeWordleDictionaryData()
         {
-            return season.Equals("Spring") && Game1.season == Season.Spring
-                || season.Equals("Summer") && Game1.season == Season.Fall
-                || season.Equals("Fall") && Game1.season == Season.Winter
-                || season.Equals("Winter") && Game1.season == Season.Spring;
-        }
-
-        private void initializeWordleData()
-        {
-            var model = this.Helper.Data.ReadGlobalData<ModData>("wordle-data");
-            if(model == null){
-                model = new ModData();
-                var rand = new Random();
+            var saveModel = this.Helper.Data.ReadGlobalData<WordleDictionaryData>("wordle-dictionary-data");
+            if(saveModel == null){
+                saveModel = new WordleDictionaryData();
                 string guessesPath = Path.Combine(this.Helper.DirectoryPath, "words", "possible_guesses.txt");
-                model.PossibleGuesses = File.ReadAllLines(guessesPath);
+                saveModel.PossibleGuesses = File.ReadAllLines(guessesPath);
 
                 string wordsPath = Path.Combine(this.Helper.DirectoryPath, "words", "possible_words.txt");
-                model.PossibleWords = File.ReadAllLines(wordsPath);
+                saveModel.PossibleWords = File.ReadAllLines(wordsPath);
             }
-
-            this.Helper.Data.WriteGlobalData("wordle-data", model);
+            this.Helper.Data.WriteGlobalData("wordle-dictionary-data", saveModel);
         }
 
-        private void initModel()
+        private void weeklyReset()
         {
-            var model = this.Helper.Data.ReadGlobalData<ModData>("wordle-data");
-            string[] words = model.PossibleWords;
+            var dictionaryModel = this.Helper.Data.ReadGlobalData<WordleDictionaryData>("wordle-dictionary-data");
+            string[] words = dictionaryModel.PossibleWords;
+
+            var saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
+            if(saveModel == null)
+            {
+                saveModel = new WordleSaveData();
+            }
             var rand = new Random();
             int index = (int) (rand.NextDouble() * (words.Length-1));
 
-            model.WordOfDay = words[index];
-            model.Guesses = new List<String>([""]);
-            model.Colors = new Color[5,5];
-            model.State = WordleState.PLAYING;
+            saveModel.WordOfWeek = words[index];
+            saveModel.Guesses = new List<String>([""]);
+            saveModel.Colors = new Color[5,5];
+            saveModel.State = WordleState.PLAYING;
+            saveModel.HasWonThisWeek = false;
             
-            this.Helper.Data.WriteGlobalData("wordle-data", model);
+            this.Helper.Data.WriteSaveData("wordle-save-data", saveModel);
+
+            CodePatches.HasWonThisWeek = false;
+
+            Game1.addHUDMessage(new HUDMessage("A new Wordle game is available.", HUDMessage.achievement_type));
         }
     }
-
-    public class ModData
+    public class WordleDictionaryData
     {
-        public String WordOfDay {get; set;}
         public String[] PossibleGuesses {get; set;}
         public String[] PossibleWords {get; set;}
+    }
+
+    public class WordleSaveData
+    {
+        public String WordOfWeek {get; set;}
+
         public List<String> Guesses {get; set;} = new List<String>([""]);
         public Color[,] Colors {get; set;} = new Color[5,5];
         public WordleState State {get; set;} = WordleState.PLAYING;
         public int Streak {get; set;} = 0;
         public int TotalWins {get; set;} = 0;
-        public String LastWinDate {get; set;} = "";
+        public bool HasWonThisWeek {get; set;} = false;
     }
     public enum WordleState
         {
         WON,
         LOST,
-        PLAYING
+        PLAYING,
+        MENU
     }
 }

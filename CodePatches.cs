@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Netcode;
 using StardewModdingAPI;
 using StardewValley;
+using StardewValley.Internal;
 using StardewValley.TerrainFeatures;
 using StardewWordle;
 
@@ -16,6 +17,7 @@ namespace StardewWordle
         static IModHelper Helper { get; set; }
         static string machineName = "kinivy_Wordle_WordleMachine";
         static TimeSpan machineAnimInterval = TimeSpan.FromMilliseconds(1000);
+        public static bool HasWonThisWeek = false;
 
         public static void Initialize(IMonitor monitor, IModHelper helper, Harmony harmony)
         {
@@ -45,12 +47,17 @@ namespace StardewWordle
         static void UpdateWhenLocation_Postfix(StardewValley.Object __instance, GameTime time)
 		{
 			if(__instance.itemId.Contains(machineName))
-            {  
-                long second = (long)(time.TotalGameTime.TotalMilliseconds / 1000);
-                int idx = (int) (second % 2);
-                if(__instance.ParentSheetIndex != idx)
+            {     
+                if (!HasWonThisWeek) {                    
+                    long second = (long)(time.TotalGameTime.TotalMilliseconds / 1000);
+                    int idx = (int) (second % 2);
+                    if(__instance.ParentSheetIndex != idx)
+                    {
+                        __instance.ParentSheetIndex = idx;
+                    }
+                } else
                 {
-			        __instance.ParentSheetIndex = idx;
+                    __instance.ParentSheetIndex = 0;
                 }
             }
 		}

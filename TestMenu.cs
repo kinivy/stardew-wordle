@@ -18,7 +18,8 @@ namespace StardewWordle
         public static int menuHeight = 700 + borderWidth * 2 + Game1.tileSize;
         private Rectangle[] GridRectangles;
         private Dictionary<char, Rectangle> KeyboardMap;
-        private ModData model;
+        private WordleSaveData saveModel;
+        private WordleDictionaryData dictionaryModel;
         private TimeSpan gridAnimStart = TimeSpan.Zero;
         private int gridAnimCount = -1;
         private static TimeSpan GRID_ANIM_INTERVAL = TimeSpan.FromMilliseconds(300);
@@ -31,12 +32,13 @@ namespace StardewWordle
         {
             this.helper = helper;
             this.Monitor = monitor;
-            this.model = this.helper.Data.ReadGlobalData<ModData>("wordle-data");
+            this.saveModel = this.helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
+            this.dictionaryModel = this.helper.Data.ReadGlobalData<WordleDictionaryData>("wordle-dictionary-data");
 
             this.GridRectangles = initGrid();
             this.KeyboardMap = initKeyboard();
 
-            Monitor.Log(getWordOfDay(), LogLevel.Debug);
+            Monitor.Log(getWordOfWeek(), LogLevel.Debug);
 
             Game1.keyboardDispatcher.Subscriber = new TextBox(null,null,Game1.smallFont,Color.Black);
         }
@@ -138,24 +140,24 @@ namespace StardewWordle
 
         private void inputLetter(String key)
         {
-            if (model.Guesses[model.Guesses.Count-1].Length == 5)
+            if (saveModel.Guesses[saveModel.Guesses.Count-1].Length == 5)
             {
                 return;
             } 
             else
             {
-                model.Guesses[model.Guesses.Count-1] += key.ToUpper();
+                saveModel.Guesses[saveModel.Guesses.Count-1] += key.ToUpper();
             }
-            this.helper.Data.WriteGlobalData("wordle-data", model);
+            this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
         }
 
         private void removeLetter()
         {
-            String guess = model.Guesses[model.Guesses.Count-1];
+            String guess = saveModel.Guesses[saveModel.Guesses.Count-1];
             if(guess.Length > 0)
             {
-                model.Guesses[model.Guesses.Count-1]= model.Guesses[model.Guesses.Count-1][..^1];
-                this.helper.Data.WriteGlobalData("wordle-data", model);
+                saveModel.Guesses[saveModel.Guesses.Count-1]= saveModel.Guesses[saveModel.Guesses.Count-1][..^1];
+                this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
             }
         }
 
@@ -165,32 +167,35 @@ namespace StardewWordle
             {
                 return;
             }
-            String lastGuess = model.Guesses.Last();
+            String lastGuess = saveModel.Guesses.Last();
             if(lastGuess.Length == 5)
             {
-                if (model.PossibleGuesses.Contains(lastGuess.ToLower()))
+                if (dictionaryModel.PossibleGuesses.Contains(lastGuess.ToLower()))
                 {
                     Game1.playSound("crit", null);
                     updateColors();       
                     gridAnimCount = 0;
-                    if (lastGuess.EqualsIgnoreCase(getWordOfDay()))
+                    if (lastGuess.EqualsIgnoreCase(getWordOfWeek()))
                     {
-                        model.State = WordleState.WON;
-                        model.TotalWins++;
-                        model.Streak++;
-                        model.LastWinDate = Game1.dayOfMonth + " " + Game1.season.ToString() + " " + Game1.year;
-                        Monitor.Log("Total Wins: " + model.TotalWins, LogLevel.Debug);
-                        Monitor.Log("Streak: " + model.Streak, LogLevel.Debug);
-                        Monitor.Log("Last Win Date: " + model.LastWinDate, LogLevel.Debug);
-                    } else if(model.Guesses.Count() == 5)
+                        saveModel.State = WordleState.WON;
+                        saveModel.TotalWins++;
+                        int reward = (int) (500 * Math.Pow(1.25, saveModel.Streak));
+                        Game1.player.addUnearnedMoney(reward);
+                        saveModel.Streak++;
+                        saveModel.HasWonThisWeek = true;
+                        Monitor.Log("Total Wins: " + saveModel.TotalWins, LogLevel.Debug);
+                        Monitor.Log("Streak: " + saveModel.Streak, LogLevel.Debug);
+                    } else if(saveModel.Guesses.Count() == 5)
                     {
-                        model.State = WordleState.LOST;
+                        saveModel.State = WordleState.LOST;
+                        saveModel.Streak = 0;
+                        Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
                     }
                     else
                     {
-                        model.Guesses.Add(""); // Start new guess
+                        saveModel.Guesses.Add(""); // Start new guess
                     }
-                    this.helper.Data.WriteGlobalData("wordle-data", model);
+                    this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
                 } else
                 {
                     // not in word Bank
@@ -202,13 +207,13 @@ namespace StardewWordle
 
         private void updateColors()
         {
-            String guess = model.Guesses.Last();
+            String guess = saveModel.Guesses.Last();
             Color[] guessColors = DetermineGridBgColor(guess);
             for(int i = 0; i < 5; i++)
             {
-                model.Colors[model.Guesses.Count()-1, i] = guessColors[i];
+                saveModel.Colors[saveModel.Guesses.Count()-1, i] = guessColors[i];
             }
-            this.helper.Data.WriteGlobalData("wordle-data", model);
+            this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
         }
 
         public override void receiveLeftClick(int x, int y, bool playSound = true)
@@ -263,16 +268,16 @@ namespace StardewWordle
             for(int i = 0; i < GridRectangles.Length; i++)
             {
                 Rectangle square = GridRectangles[i];
-                if( model.Guesses.Count() > i / 5 && model.Guesses[ i / 5].Length > i % 5)
+                if( saveModel.Guesses.Count() > i / 5 && saveModel.Guesses[ i / 5].Length > i % 5)
                 {
-                    String guess = model.Guesses[ i / 5];
+                    String guess = saveModel.Guesses[ i / 5];
                     String letter = guess[i % 5].ToString();
                     Color bgColor = Color.White;
-                    if(!inPlayingState() || (inPlayingState() && i / 5 != model.Guesses.Count-1))
+                    if(!inPlayingState() || (inPlayingState() && i / 5 != saveModel.Guesses.Count-1))
                     {
-                        bgColor = model.Colors[i / 5, i % 5];
+                        bgColor = saveModel.Colors[i / 5, i % 5];
                     }
-                    if (gridAnimCount != -1 && i / 5 == model.Guesses.Count - (inPlayingState() ? 2 : 1))
+                    if (gridAnimCount != -1 && i / 5 == saveModel.Guesses.Count - (inPlayingState() ? 2 : 1))
                     {
                         if(i % 5 > gridAnimCount)
                         {
@@ -325,9 +330,9 @@ namespace StardewWordle
 
         public void drawStats(SpriteBatch b )
         {
-            String totalWinsText = "Total Wins:\t" + model.TotalWins;
-            String streakText = "Streak:\t" + model.Streak;
-            String rewardText = "Reward:\t???";
+            String totalWinsText = "Total Wins: " + saveModel.TotalWins;
+            String streakText = "Streak:    " + saveModel.Streak;
+            String rewardText = "Reward:    " + (int) (500 * Math.Pow(1.25, saveModel.Streak));
             int margin = 12;
             Vector2 totalWinsSize = Game1.dialogueFont.MeasureString(totalWinsText);
             Vector2 totalWinsPos = new Vector2(
@@ -370,7 +375,7 @@ namespace StardewWordle
 
         private Color[] DetermineGridBgColor(String guess)
         {
-            String correctWord = getWordOfDay().ToUpper();
+            String correctWord = getWordOfWeek().ToUpper();
             Color[] colors = [GRAY,GRAY,GRAY,GRAY,GRAY];
             
             Dictionary<char,int> remainingCounts = new Dictionary<char, int>();
@@ -409,15 +414,15 @@ namespace StardewWordle
 
         private Color DetermineKeyBgColor(char key)
         {
-            String correctWord = getWordOfDay().ToUpper();
+            String correctWord = getWordOfWeek().ToUpper();
             Color returnColor = LIGHTGRAY;
 
-            for(int i = 0; i < model.Guesses.Count - 1; i++)
+            for(int i = 0; i < saveModel.Guesses.Count - 1; i++)
             {
-                String guess = model.Guesses[i];
+                String guess = saveModel.Guesses[i];
                 for(int j = 0; j < guess.Length;  j++)
                 {
-                    if(i == model.Guesses.Count - (inPlayingState() ? 2 : 1) && gridAnimCount != -1 && j > gridAnimCount)
+                    if(i == saveModel.Guesses.Count - (inPlayingState() ? 2 : 1) && gridAnimCount != -1 && j > gridAnimCount)
                     {
                         continue;
                     }
@@ -441,17 +446,17 @@ namespace StardewWordle
 
         private bool inWinState()
         {
-            return model.State == WordleState.WON;
+            return saveModel.State == WordleState.WON;
         }
 
         private bool inPlayingState()
         {
-            return model.State == WordleState.PLAYING;
+            return saveModel.State == WordleState.PLAYING;
         }
 
         private bool InLoseState()
         {
-            return model.State == WordleState.LOST;
+            return saveModel.State == WordleState.LOST;
         }
 
         private int[] getAllIndices(String target, char letter)
@@ -467,11 +472,11 @@ namespace StardewWordle
             return indices.ToArray();
         }
 
-        private string getWordOfDay()
+        private string getWordOfWeek()
         {
-            if(model != null)
+            if(saveModel != null)
             {
-                return model.WordOfDay;
+                return saveModel.WordOfWeek;
             }
             return "";
         }
