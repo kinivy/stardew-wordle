@@ -19,7 +19,7 @@ namespace StardewWordle
         static TimeSpan machineAnimInterval = TimeSpan.FromMilliseconds(1000);
         public static bool HasWonThisWeek = false;
 
-        public static void Initialize(IMonitor monitor, IModHelper helper, Harmony harmony)
+        public static void Initialize(IMonitor monitor, IModHelper helper, Harmony harmony, ModConfig config)
         {
             Monitor = monitor;
             Helper = helper;

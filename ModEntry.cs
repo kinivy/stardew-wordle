@@ -23,7 +23,7 @@ namespace StardewWordle
 
             var harmony = new Harmony(this.ModManifest.UniqueID);
 
-            CodePatches.Initialize(this.Monitor, helper, harmony);
+            CodePatches.Initialize(this.Monitor, helper, harmony, Config);
         }
 
         private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
@@ -87,6 +87,13 @@ namespace StardewWordle
                 mod: this.ModManifest,
                 reset: () => Config = new ModConfig(),
                 save: () => this.Helper.WriteConfig(Config)
+            );
+
+            configMenu.AddBoolOption(
+                mod: this.ModManifest,
+                name: () => "Dark Theme",
+                getValue: () => Config.DarkTheme,
+                setValue: value => Config.DarkTheme = value
             );
 		}
 

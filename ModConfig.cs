@@ -2,6 +2,6 @@ namespace StardewWordle
 {
     public class ModConfig
     {
-        bool darkTheme = false;
+        public bool DarkTheme = false;
     }
 }
