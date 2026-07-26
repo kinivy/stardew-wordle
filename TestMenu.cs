@@ -24,6 +24,7 @@ namespace StardewWordle
         private static TimeSpan GRID_ANIM_INTERVAL = TimeSpan.FromMilliseconds(300);
         private static TimeSpan NOT_IN_BANK_ANIM_INTERVAL = TimeSpan.FromMilliseconds(1000);
         private static TimeSpan  notInBankMessageStart = TimeSpan.Zero;
+        private bool displayNotInBankMessage = false;
         private Color YELLOW = new Color(196, 173, 85);
         private Color GREEN = new Color(103, 168, 92);
         private  Color GRAY = new Color(120, 124, 128);
@@ -98,6 +99,23 @@ namespace StardewWordle
 
         public override void update(GameTime gameTime)
         {
+            animateGrid(gameTime);
+
+            if (displayNotInBankMessage && notInBankMessageStart == TimeSpan.Zero)
+            {
+                notInBankMessageStart = gameTime.TotalGameTime;
+            }
+
+            if(displayNotInBankMessage && notInBankMessageStart + NOT_IN_BANK_ANIM_INTERVAL < gameTime.TotalGameTime)
+            {
+                notInBankMessageStart = TimeSpan.Zero;
+                displayNotInBankMessage = false;
+                return;
+            }
+        }
+
+        private void animateGrid(GameTime gameTime)
+        {
             if(gridAnimCount == 0 && gridAnimStart == TimeSpan.Zero)
             {
                 gridAnimStart = gameTime.TotalGameTime;
@@ -171,6 +189,7 @@ namespace StardewWordle
             String guess = saveModel.Guesses[saveModel.Guesses.Count-1];
             if(guess.Length > 0)
             {
+                Game1.playSound("clubhit", null);
                 saveModel.Guesses[saveModel.Guesses.Count-1]= saveModel.Guesses[saveModel.Guesses.Count-1][..^1];
                 this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
             }
@@ -214,6 +233,7 @@ namespace StardewWordle
                 } else
                 {
                     // not in word Bank
+                    displayNotInBankMessage = true;
                     Monitor.Log("Not in word bank.", LogLevel.Debug);
                     Game1.playSound("fishEscape", null);
                 }
@@ -260,7 +280,6 @@ namespace StardewWordle
                 if(key == Keys.Back)
                 {
                     removeLetter();
-                    Game1.playSound("clubhit", null);
                 }
 
                 if(key == Keys.Enter)
@@ -374,6 +393,23 @@ namespace StardewWordle
             Utility.drawBoldText(b,rewardText,Game1.dialogueFont,rewardPos,Color.Black);
         }
 
+        private void drawNotInBankMessage(SpriteBatch b)
+        {
+            Vector2 wordsSize = Game1.smallFont.MeasureString("Not in word list");
+
+            int padding = 8;
+            int BoxWidth = (int) wordsSize.X + padding;
+            int BoxHeight = (int) wordsSize.Y + padding;
+
+            int boxXPos = this.xPositionOnScreen + (this.width - BoxWidth) / 2;
+            int boxYPos = GridRectangles.Last().Y + Game1.tileSize + 10;
+            Rectangle box = new Rectangle(boxXPos, boxYPos, BoxWidth, BoxHeight);
+
+            Vector2 textPos = new Vector2(boxXPos + padding/2, boxYPos + padding/2);
+            Utility.DrawSquare(b,box,0,null,Config.DarkTheme ? Color.White : Color.Black);
+            Utility.drawBoldText(b, "Not in word list", Game1.smallFont, textPos, Config.DarkTheme ? Color.Black : Color.White);
+        }
+
         public override void draw(SpriteBatch b)
         {
             base.draw(b);
@@ -386,8 +422,15 @@ namespace StardewWordle
             {
                 drawStats(b);
             }
+
+            if (displayNotInBankMessage)
+            {
+                drawNotInBankMessage(b);
+            }
             drawMouse(b);
         }
+
+
 
         private Color[] DetermineGridBgColor(String guess)
         {
