@@ -11,7 +11,6 @@ namespace StardewWordle
 {
     public class TestMenu : IClickableMenu
     {
-        private ClickableTextureComponent okButton;
         private IMonitor Monitor;
         private IModHelper helper;
         public static int menuWidth = 650 + borderWidth * 2;
@@ -23,10 +22,14 @@ namespace StardewWordle
         private TimeSpan gridAnimStart = TimeSpan.Zero;
         private int gridAnimCount = -1;
         private static TimeSpan GRID_ANIM_INTERVAL = TimeSpan.FromMilliseconds(300);
+        private static TimeSpan NOT_IN_BANK_ANIM_INTERVAL = TimeSpan.FromMilliseconds(1000);
+        private static TimeSpan  notInBankMessageStart = TimeSpan.Zero;
         private static Color YELLOW = new Color(196, 173, 85);
         private static Color GREEN = new Color(103, 168, 92);
         private static Color GRAY = new Color(120, 124, 128);
         private static Color LIGHTGRAY = new Color(211, 214, 219);
+        private static int GUESS_LENGTH = 5;
+        private static int NUM_GUESSES = 6;
         
         public TestMenu(IModHelper helper, IMonitor monitor) :  base((int)getAppropriateMenuPosition().X, (int)getAppropriateMenuPosition().Y, menuWidth , menuHeight)
         {
@@ -45,14 +48,15 @@ namespace StardewWordle
 
         private Rectangle[] initGrid()
         {
-            Rectangle[] grid = new Rectangle[25];
+            Rectangle[] grid = new Rectangle[NUM_GUESSES*GUESS_LENGTH];
             int width = Game1.tileSize;
             int margin = 4;
-            int rowStartX = this.xPositionOnScreen + (this.width - (width * 5)) / 2;
-            for( int i = 0; i < 25; i++ )
+            int rowStartX = this.xPositionOnScreen + (this.width - (width * GUESS_LENGTH)) / 2;
+            for( int i = 0; i < NUM_GUESSES * GUESS_LENGTH; i++ )
             {
-                int xPos = rowStartX + (i % 5) * width + (i % 5 * margin);
-                int yPos = this.yPositionOnScreen + borderWidth + spaceToClearTopBorder + (width * 1) + (((i / 5)-1) * margin) + (((i / 5)-1) * width);
+                int xPos = rowStartX + (i % GUESS_LENGTH) * width + (i % GUESS_LENGTH * margin);
+                int yPos = this.yPositionOnScreen + borderWidth + spaceToClearTopBorder + (width * 1) + (((i / GUESS_LENGTH)-1) * margin) + (((i / GUESS_LENGTH)-1) * width);
+                Monitor.Log("Square " + i + " x " + xPos + "y " + yPos, LogLevel.Debug);
                 grid[i] = new Rectangle(xPos, yPos, width, width);
             }
             return grid;
@@ -73,7 +77,7 @@ namespace StardewWordle
                 for(int j = 0; j < row.Length; j++)
                 {
                     int xPos = rowStartX + (j * width) + (j * margin);
-                    int yPos = this.yPositionOnScreen + (this.height - ( height * 4)) + (i * height) + (i * margin);
+                    int yPos = this.yPositionOnScreen + (this.height - ( height * 375/100)) + (i * height) + (i * margin);
                     
                     map.Add(row[j], new Rectangle(xPos, yPos, width, height));
                 }
@@ -86,7 +90,7 @@ namespace StardewWordle
             if(gridAnimCount == 0 && gridAnimStart == TimeSpan.Zero)
             {
                 gridAnimStart = gameTime.TotalGameTime;
-            } else if ( gridAnimStart + 5 * GRID_ANIM_INTERVAL < gameTime.TotalGameTime)
+            } else if ( gridAnimStart + GUESS_LENGTH * GRID_ANIM_INTERVAL < gameTime.TotalGameTime)
             {
                 gridAnimCount = -1;
                 gridAnimStart = TimeSpan.Zero;
@@ -95,7 +99,7 @@ namespace StardewWordle
 
             if(gridAnimCount != -1)
             {
-                for(int i = 0; i < 5; i++)
+                for(int i = 0; i < GUESS_LENGTH; i++)
                 {
                     if (gameTime.TotalGameTime > gridAnimStart + ( i * GRID_ANIM_INTERVAL ) && i > gridAnimCount)
                     {
@@ -140,7 +144,7 @@ namespace StardewWordle
 
         private void inputLetter(String key)
         {
-            if (saveModel.Guesses[saveModel.Guesses.Count-1].Length == 5)
+            if (saveModel.Guesses[saveModel.Guesses.Count-1].Length >= GUESS_LENGTH)
             {
                 return;
             } 
@@ -168,7 +172,7 @@ namespace StardewWordle
                 return;
             }
             String lastGuess = saveModel.Guesses.Last();
-            if(lastGuess.Length == 5)
+            if(lastGuess.Length == GUESS_LENGTH)
             {
                 if (dictionaryModel.PossibleGuesses.Contains(lastGuess.ToLower()))
                 {
@@ -185,7 +189,7 @@ namespace StardewWordle
                         saveModel.HasWonThisWeek = true;
                         Monitor.Log("Total Wins: " + saveModel.TotalWins, LogLevel.Debug);
                         Monitor.Log("Streak: " + saveModel.Streak, LogLevel.Debug);
-                    } else if(saveModel.Guesses.Count() == 5)
+                    } else if(saveModel.Guesses.Count() == NUM_GUESSES)
                     {
                         saveModel.State = WordleState.LOST;
                         saveModel.Streak = 0;
@@ -209,7 +213,7 @@ namespace StardewWordle
         {
             String guess = saveModel.Guesses.Last();
             Color[] guessColors = DetermineGridBgColor(guess);
-            for(int i = 0; i < 5; i++)
+            for(int i = 0; i < GUESS_LENGTH; i++)
             {
                 saveModel.Colors[saveModel.Guesses.Count()-1, i] = guessColors[i];
             }
@@ -268,18 +272,18 @@ namespace StardewWordle
             for(int i = 0; i < GridRectangles.Length; i++)
             {
                 Rectangle square = GridRectangles[i];
-                if( saveModel.Guesses.Count() > i / 5 && saveModel.Guesses[ i / 5].Length > i % 5)
+                if( saveModel.Guesses.Count() > i / GUESS_LENGTH && saveModel.Guesses[ i /  GUESS_LENGTH].Length > i % GUESS_LENGTH)
                 {
-                    String guess = saveModel.Guesses[ i / 5];
-                    String letter = guess[i % 5].ToString();
+                    String guess = saveModel.Guesses[ i / GUESS_LENGTH ];
+                    String letter = guess[i % GUESS_LENGTH].ToString();
                     Color bgColor = Color.White;
-                    if(!inPlayingState() || (inPlayingState() && i / 5 != saveModel.Guesses.Count-1))
+                    if(!inPlayingState() || (inPlayingState() && i / GUESS_LENGTH != saveModel.Guesses.Count-1))
                     {
-                        bgColor = saveModel.Colors[i / 5, i % 5];
+                        bgColor = saveModel.Colors[i / GUESS_LENGTH, i % GUESS_LENGTH];
                     }
-                    if (gridAnimCount != -1 && i / 5 == saveModel.Guesses.Count - (inPlayingState() ? 2 : 1))
+                    if (gridAnimCount != -1 && i / GUESS_LENGTH == saveModel.Guesses.Count - (inPlayingState() ? 2 : 1))
                     {
-                        if(i % 5 > gridAnimCount)
+                        if(i % GUESS_LENGTH > gridAnimCount)
                         {
                             bgColor = Color.White;
                         }
@@ -360,7 +364,6 @@ namespace StardewWordle
         public override void draw(SpriteBatch b)
         {
             base.draw(b);
-            //Game1.drawDialogueBox(this.xPositionOnScreen, this.yPositionOnScreen, this.width, this.height, false, true);
             drawBoxAndHeader(b);
             drawGrid(b);
             if ( inPlayingState() || (!inPlayingState() && gridAnimCount != -1))

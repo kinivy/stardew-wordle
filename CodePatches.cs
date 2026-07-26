@@ -48,7 +48,8 @@ namespace StardewWordle
 		{
 			if(__instance.itemId.Contains(machineName))
             {     
-                if (!HasWonThisWeek) {                    
+                if (!HasWonThisWeek) 
+                {
                     long second = (long)(time.TotalGameTime.TotalMilliseconds / 1000);
                     int idx = (int) (second % 2);
                     if(__instance.ParentSheetIndex != idx)

@@ -69,6 +69,7 @@ namespace StardewWordle
             if(saveModel == null)
             {
                 weeklyReset();
+                saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
             }
             CodePatches.HasWonThisWeek = saveModel.HasWonThisWeek;
         }
@@ -102,16 +103,16 @@ namespace StardewWordle
 
         private void initializeWordleDictionaryData()
         {
-            var saveModel = this.Helper.Data.ReadGlobalData<WordleDictionaryData>("wordle-dictionary-data");
-            if(saveModel == null){
-                saveModel = new WordleDictionaryData();
+            var dictionaryData = this.Helper.Data.ReadGlobalData<WordleDictionaryData>("wordle-dictionary-data");
+            if(dictionaryData == null){
+                dictionaryData = new WordleDictionaryData();
                 string guessesPath = Path.Combine(this.Helper.DirectoryPath, "words", "possible_guesses.txt");
-                saveModel.PossibleGuesses = File.ReadAllLines(guessesPath);
+                dictionaryData.PossibleGuesses = File.ReadAllLines(guessesPath);
 
                 string wordsPath = Path.Combine(this.Helper.DirectoryPath, "words", "possible_words.txt");
-                saveModel.PossibleWords = File.ReadAllLines(wordsPath);
+                dictionaryData.PossibleWords = File.ReadAllLines(wordsPath);
             }
-            this.Helper.Data.WriteGlobalData("wordle-dictionary-data", saveModel);
+            this.Helper.Data.WriteGlobalData("wordle-dictionary-data", dictionaryData);
         }
 
         private void weeklyReset()
@@ -129,7 +130,7 @@ namespace StardewWordle
 
             saveModel.WordOfWeek = words[index];
             saveModel.Guesses = new List<String>([""]);
-            saveModel.Colors = new Color[5,5];
+            saveModel.Colors = new Color[6,5];
             saveModel.State = WordleState.PLAYING;
             saveModel.HasWonThisWeek = false;
             
@@ -151,7 +152,7 @@ namespace StardewWordle
         public String WordOfWeek {get; set;}
 
         public List<String> Guesses {get; set;} = new List<String>([""]);
-        public Color[,] Colors {get; set;} = new Color[5,5];
+        public Color[,] Colors {get; set;} = new Color[6,5];
         public WordleState State {get; set;} = WordleState.PLAYING;
         public int Streak {get; set;} = 0;
         public int TotalWins {get; set;} = 0;
