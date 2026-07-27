@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using StardewValley.Extensions;
+using Microsoft.VisualBasic;
 
 
 namespace StardewWordle
@@ -33,6 +34,8 @@ namespace StardewWordle
         private static int GUESS_LENGTH = 5;
         private static int NUM_GUESSES = 6;
         private static ModConfig Config;
+        private static int TILE_WIDTH = Game1.tileSize;
+        private static int TILE_MARGIN = 5;
         
         public TestMenu(IModHelper helper, IMonitor monitor) :  base((int)getAppropriateMenuPosition().X, (int)getAppropriateMenuPosition().Y, menuWidth , menuHeight)
         {
@@ -62,14 +65,12 @@ namespace StardewWordle
         private Rectangle[] initGrid()
         {
             Rectangle[] grid = new Rectangle[NUM_GUESSES*GUESS_LENGTH];
-            int width = Game1.tileSize;
-            int margin = 5;
-            int rowStartX = this.xPositionOnScreen + (this.width - (width * GUESS_LENGTH)) / 2;
+            int rowStartX = this.xPositionOnScreen + (this.width - GUESS_LENGTH * (TILE_MARGIN + TILE_WIDTH)) / 2;
             for( int i = 0; i < NUM_GUESSES * GUESS_LENGTH; i++ )
             {
-                int xPos = rowStartX + (i % GUESS_LENGTH) * width + (i % GUESS_LENGTH * margin);
-                int yPos = this.yPositionOnScreen + borderWidth + spaceToClearTopBorder + (width * 1) + (((i / GUESS_LENGTH)-1) * margin) + (((i / GUESS_LENGTH)-1) * width);
-                grid[i] = new Rectangle(xPos, yPos, width, width);
+                int xPos = rowStartX + (i % GUESS_LENGTH) * TILE_WIDTH + (i % GUESS_LENGTH * TILE_MARGIN);
+                int yPos = this.yPositionOnScreen + borderWidth + spaceToClearTopBorder + TILE_WIDTH + (((i / GUESS_LENGTH)-1) * TILE_MARGIN) + (((i / GUESS_LENGTH)-1) * TILE_WIDTH);
+                grid[i] = new Rectangle(xPos, yPos, TILE_WIDTH, TILE_WIDTH);
             }
             return grid;
         }
@@ -211,14 +212,9 @@ namespace StardewWordle
                     gridAnimCount = 0;
                     if (lastGuess.EqualsIgnoreCase(getWordOfWeek()))
                     {
-                        saveModel.State = WordleState.WON;
-                        saveModel.TotalWins++;
+                        saveModel.handleWin();
                         int reward = (int) (500 * Math.Pow(1.25, saveModel.Streak));
                         Game1.player.addUnearnedMoney(reward);
-                        saveModel.Streak++;
-                        saveModel.HasWonThisWeek = true;
-                        Monitor.Log("Total Wins: " + saveModel.TotalWins, LogLevel.Debug);
-                        Monitor.Log("Streak: " + saveModel.Streak, LogLevel.Debug);
                     } else if(saveModel.Guesses.Count() == NUM_GUESSES)
                     {
                         saveModel.State = WordleState.LOST;
@@ -361,36 +357,37 @@ namespace StardewWordle
                 this.xPositionOnScreen + (this.width - headerSize.X * 1.5f) / 2f,
                 this.yPositionOnScreen + borderWidth + 10
             );
-            Utility.drawBoldText(b,"WORDLE",Game1.dialogueFont,headerPos,BACKGROUND == Color.White ? Color.Black : Color.White,1.5f);
+            Utility.drawBoldText(b,"WORDLE",Game1.dialogueFont,headerPos,BACKGROUND == Color.White ? Color.Black : Color.White,1.5f,-1,2);
         }
 
-        public void drawStats(SpriteBatch b )
+        private void drawStats(SpriteBatch b )
         {
-            String totalWinsText = "Total Wins: " + saveModel.TotalWins;
-            String streakText = "Streak:    " + saveModel.Streak;
-            String rewardText = "Reward:    " + (int) (500 * Math.Pow(1.25, saveModel.Streak));
-            int margin = 12;
-            Vector2 totalWinsSize = Game1.dialogueFont.MeasureString(totalWinsText);
-            Vector2 totalWinsPos = new Vector2(
-                this.xPositionOnScreen + (this.width - totalWinsSize.X) / 2f,
-                this.yPositionOnScreen + borderWidth + (this.height - 4*totalWinsSize.Y) - margin
-            );
+            int maxWidth = (int) Game1.dialogueFont.MeasureString("Total Wins").X;
+            int maxHeight = (int) Game1.dialogueFont.MeasureString("Total Wins").Y * 2 + 5;
+            int xPadding = 30;
+            int yPadding = 10;
+            int firstX = xPositionOnScreen + this.width/2 -xPadding - maxWidth;
+            int secondX = xPositionOnScreen + width/2 + xPadding;
+            int firstY = GridRectangles.Last().Y + TILE_WIDTH + yPadding * 2;
+            int secondY = firstY + yPadding + maxHeight;
+            int reward = (int) (500 * Math.Pow(1.25, saveModel.Streak));
+            drawStat(b,"Reward", reward, firstX, firstY, maxWidth);
+            drawStat(b,"Total Wins", saveModel.TotalWins, firstX, secondY, maxWidth);
+            drawStat(b,"Streak", saveModel.Streak, secondX, firstY, maxWidth);
+            drawStat(b,"Max Streak", saveModel.MaxStreak, secondX, secondY, maxWidth);
+        }   
 
-            Vector2 streakSize = Game1.dialogueFont.MeasureString(streakText);
-            Vector2 streakPos = new Vector2(
-                this.xPositionOnScreen + (this.width - streakSize.X) / 2f,
-                this.yPositionOnScreen + borderWidth + (this.height - 3*streakSize.Y) - margin
-            );
+        private void drawStat(SpriteBatch b, String label, int stat, int xPos, int yPos, int width)
+        {
+            int margin = 5;
+            Vector2 labelSize = Game1.dialogueFont.MeasureString(label);
+            Vector2 labelPos = new Vector2(xPos + width/2 - labelSize.X/2, yPos);
 
-            Vector2 rewardSize = Game1.dialogueFont.MeasureString(totalWinsText);
-            Vector2 rewardPos = new Vector2(
-                this.xPositionOnScreen + (this.width - rewardSize.X) / 2f,
-                this.yPositionOnScreen + borderWidth + (this.height - 2*rewardSize.Y) - margin
-            );
+            Vector2 statSize = Game1.dialogueFont.MeasureString(stat.ToString());
+            Vector2 statPos = new Vector2(xPos + width/2 - statSize.X/2, yPos + labelSize.Y + margin);
 
-            Utility.drawBoldText(b,totalWinsText,Game1.dialogueFont,totalWinsPos,Color.Black);
-            Utility.drawBoldText(b,streakText,Game1.dialogueFont,streakPos,Color.Black);
-            Utility.drawBoldText(b,rewardText,Game1.dialogueFont,rewardPos,Color.Black);
+            Utility.drawBoldText(b,label, Game1.dialogueFont,labelPos,Color.White);
+            Utility.drawBoldText(b,stat.ToString(), Game1.dialogueFont,statPos,Color.White);
         }
 
         private void drawNotInBankMessage(SpriteBatch b)

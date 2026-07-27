@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Xml;
 using HarmonyLib;
 using Microsoft.Xna.Framework;
@@ -63,10 +64,11 @@ namespace StardewWordle
             }
 		}
 
-        static void CheckForAction_Postfix(StardewValley.Object __instance, Farmer who, bool justCheckingForActivity = false)
+        static void CheckForAction_Postfix(StardewValley.Object __instance, ref bool __result, Farmer who, bool justCheckingForActivity = false)
         {
             if(__instance.itemId.Contains(machineName))
             {
+                __result = true;
                 if (justCheckingForActivity)
                 {
                     return;

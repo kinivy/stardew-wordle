@@ -156,14 +156,26 @@ namespace StardewWordle
 
     public class WordleSaveData
     {
-        public String WordOfWeek {get; set;}
-
+        public String WordOfWeek {get; set;} = "";
         public List<String> Guesses {get; set;} = new List<String>([""]);
         public Color[,] Colors {get; set;} = new Color[6,5];
         public WordleState State {get; set;} = WordleState.PLAYING;
         public int Streak {get; set;} = 0;
+        public int MaxStreak {get; set;} = 0;
         public int TotalWins {get; set;} = 0;
         public bool HasWonThisWeek {get; set;} = false;
+        public void handleWin()
+        {
+            Streak++;
+            if(MaxStreak < Streak)
+            {
+                MaxStreak = Streak;
+            }
+            HasWonThisWeek = true;
+            CodePatches.HasWonThisWeek = true;
+            TotalWins++;
+            State = WordleState.WON;
+        }
     }
     public enum WordleState
         {
