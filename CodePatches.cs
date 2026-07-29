@@ -39,9 +39,9 @@ namespace StardewWordle
         }
 		
 		static void Instance_Update_Postfix(GameTime gameTime) {
-			if(Game1.activeClickableMenu != null && Game1.activeClickableMenu.GetType().Name == "TestMenu")
+			if(Game1.activeClickableMenu != null && Game1.activeClickableMenu.GetType().Name == "WordleMenu")
             {
-                ((TestMenu) Game1.activeClickableMenu).update(gameTime);
+                ((WordleMenu) Game1.activeClickableMenu).update(gameTime);
             }
 		}
 
@@ -73,7 +73,7 @@ namespace StardewWordle
                 {
                     return;
                 }
-                Game1.activeClickableMenu = new TestMenu(Helper, Monitor);
+                Game1.activeClickableMenu = new WordleMenu(Helper, Monitor);
             }
         }
     }

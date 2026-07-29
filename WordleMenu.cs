@@ -5,12 +5,11 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using StardewValley.Extensions;
-using Microsoft.VisualBasic;
 
 
 namespace StardewWordle
 {
-    public class TestMenu : IClickableMenu
+    public class WordleMenu : IClickableMenu
     {
         private IMonitor Monitor;
         private IModHelper helper;
@@ -22,44 +21,30 @@ namespace StardewWordle
         private WordleDictionaryData dictionaryModel;
         private TimeSpan gridAnimStart = TimeSpan.Zero;
         private int gridAnimCount = -1;
-        private static TimeSpan GRID_ANIM_INTERVAL = TimeSpan.FromMilliseconds(300);
-        private static TimeSpan NOT_IN_BANK_ANIM_INTERVAL = TimeSpan.FromMilliseconds(1000);
-        private static TimeSpan  notInBankMessageStart = TimeSpan.Zero;
+        private TimeSpan GRID_ANIM_INTERVAL = TimeSpan.FromMilliseconds(300);
+        private TimeSpan NOT_IN_BANK_ANIM_INTERVAL = TimeSpan.FromMilliseconds(1000);
+        private TimeSpan  notInBankMessageStart = TimeSpan.Zero;
         private bool displayNotInBankMessage = false;
-        private Color YELLOW = new Color(196, 173, 85);
-        private Color GREEN = new Color(103, 168, 92);
-        private  Color GRAY = new Color(120, 124, 128);
-        private Color LIGHTGRAY = new Color(211, 214, 219);
-        private Color BACKGROUND = Color.White;
-        private static int GUESS_LENGTH = 5;
-        private static int NUM_GUESSES = 6;
-        private static ModConfig Config;
-        private static int TILE_WIDTH = Game1.tileSize;
-        private static int TILE_MARGIN = 5;
-        
-        public TestMenu(IModHelper helper, IMonitor monitor) :  base((int)getAppropriateMenuPosition().X, (int)getAppropriateMenuPosition().Y, menuWidth , menuHeight)
+        private int GUESS_LENGTH = 5;
+        private int NUM_GUESSES = 6;
+        private ModConfig Config;
+        private int TILE_WIDTH = Game1.tileSize;
+        private int TILE_MARGIN = 5;  
+        private WordleTheme Theme;      
+        public WordleMenu(IModHelper helper, IMonitor monitor) :  base((int)getAppropriateMenuPosition().X, (int)getAppropriateMenuPosition().Y, menuWidth , menuHeight)
         {
             this.helper = helper;
             this.Monitor = monitor;
             this.saveModel = this.helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
             this.dictionaryModel = this.helper.Data.ReadGlobalData<WordleDictionaryData>("wordle-dictionary-data");
-
-            Config = helper.ReadConfig<ModConfig>();
-            if (Config.DarkTheme)
-            {
-                BACKGROUND = new Color(18,18,18);
-                GRAY = new Color(58,58,60);
-                LIGHTGRAY = new Color(130,131,133);
-                GREEN = new Color(82,141,77);
-                YELLOW = new Color(181,159,59);
-            }
+            this.Config = helper.ReadConfig<ModConfig>();
+            this.Theme = new WordleTheme(Config.DarkTheme);
 
             this.GridRectangles = initGrid();
             this.KeyboardMap = initKeyboard();
 
             Monitor.Log(getWordOfWeek(), LogLevel.Debug);
-
-            Game1.keyboardDispatcher.Subscriber = new TextBox(null,null,Game1.smallFont,Color.Black);
+            Game1.keyboardDispatcher.Subscriber = new TextBox(null,null,Game1.smallFont,Theme.KEYBOARD_ACTIVE_TEXT);
         }
 
         private Rectangle[] initGrid()
@@ -302,7 +287,7 @@ namespace StardewWordle
                 {
                     String guess = saveModel.Guesses[ i / GUESS_LENGTH ];
                     String letter = guess[i % GUESS_LENGTH].ToString();
-                    Color bgColor = BACKGROUND;
+                    Color bgColor = Theme.BACKGROUND;
                     if(!inPlayingState() || (inPlayingState() && i / GUESS_LENGTH != saveModel.Guesses.Count-1))
                     {
                         bgColor = saveModel.Colors[i / GUESS_LENGTH, i % GUESS_LENGTH];
@@ -311,20 +296,20 @@ namespace StardewWordle
                     {
                         if(i % GUESS_LENGTH > gridAnimCount)
                         {
-                            bgColor = BACKGROUND;
+                            bgColor = Theme.BACKGROUND;
                         }
                     }
-                    Color borderColor = bgColor == BACKGROUND ? BACKGROUND == Color.White ? GRAY : LIGHTGRAY : bgColor;
+                    Color borderColor = bgColor == Theme.BACKGROUND ? Theme.ACTIVE_TILE_BORDER : bgColor;
                     Utility.DrawSquare(b, square, 3, borderColor, bgColor);
                     Vector2 letterSize = Game1.dialogueFont.MeasureString(letter);
                     Vector2 letterPos = new Vector2(
                         square.X + (square.Width - letterSize.X) / 2f,
                         square.Y + (square.Height - letterSize.Y) / 2f
                     );
-                    Utility.drawBoldText(b, letter, Game1.dialogueFont, letterPos, bgColor == Color.White ? Color.Black : Color.White);
+                    Utility.drawBoldText(b, letter, Game1.dialogueFont, letterPos, bgColor == Theme.BACKGROUND ? Theme.ACTIVE_TILE_TEXT : Theme.INACTIVE_TILE_TEXT);
                 } else
                 {
-                    Utility.DrawSquare(b, square, 3, BACKGROUND == Color.White ? LIGHTGRAY : GRAY, BACKGROUND);
+                    Utility.DrawSquare(b, square, 3, Theme.INACTIVE_TILE_BORDER, Theme.BACKGROUND);
                 }
             }
         }
@@ -342,7 +327,7 @@ namespace StardewWordle
                     rect.X + (rect.Width - letterSize.X) / 2f,
                     rect.Y + (rect.Height - letterSize.Y) / 2f
                 );
-                Color textColor = bgColor == LIGHTGRAY ? BACKGROUND == Color.White ? Color.Black : Color.White : Color.White;
+                Color textColor = bgColor == Theme.KEYBOARD_BG ? Theme.KEYBOARD_TEXT : Theme.KEYBOARD_ACTIVE_TEXT;
                 Utility.drawBoldText(b, letter, Game1.smallFont, letterPos, textColor);
             }
         }
@@ -350,14 +335,14 @@ namespace StardewWordle
         public void drawBoxAndHeader(SpriteBatch b)
         {
             Rectangle box = new Rectangle(this.xPositionOnScreen, this.yPositionOnScreen, this.width, this.height);
-            Utility.DrawSquare(b, box, 12, GRAY, BACKGROUND);
+            Utility.DrawSquare(b, box, 12, Theme.INACTIVE_TILE_BORDER, Theme.BACKGROUND);
 
             Vector2 headerSize = Game1.dialogueFont.MeasureString("WORDLE");
             Vector2 headerPos = new Vector2(
                 this.xPositionOnScreen + (this.width - headerSize.X * 1.5f) / 2f,
                 this.yPositionOnScreen + borderWidth + 10
             );
-            Utility.drawBoldText(b,"WORDLE",Game1.dialogueFont,headerPos,BACKGROUND == Color.White ? Color.Black : Color.White,1.5f,-1,2);
+            Utility.drawBoldText(b,"WORDLE",Game1.dialogueFont,headerPos,Theme.HEADER_COLOR,1.5f,-1,2);
         }
 
         private void drawStats(SpriteBatch b )
@@ -371,11 +356,11 @@ namespace StardewWordle
             int firstY = GridRectangles.Last().Y + TILE_WIDTH + yPadding * 2;
             int secondY = firstY + yPadding + maxHeight;
             int reward = (int) (500 * Math.Pow(1.25, saveModel.Streak));
-            drawStat(b,"Reward", reward, firstX, firstY, maxWidth);
+            drawStat(b,"Reward", saveModel.State == WordleState.WON ? reward : 0, firstX, firstY, maxWidth);
             drawStat(b,"Total Wins", saveModel.TotalWins, firstX, secondY, maxWidth);
             drawStat(b,"Streak", saveModel.Streak, secondX, firstY, maxWidth);
             drawStat(b,"Max Streak", saveModel.MaxStreak, secondX, secondY, maxWidth);
-        }   
+        }
 
         private void drawStat(SpriteBatch b, String label, int stat, int xPos, int yPos, int width)
         {
@@ -384,10 +369,17 @@ namespace StardewWordle
             Vector2 labelPos = new Vector2(xPos + width/2 - labelSize.X/2, yPos);
 
             Vector2 statSize = Game1.dialogueFont.MeasureString(stat.ToString());
+            if(statSize.X > width) { width = (int) statSize.X; }
             Vector2 statPos = new Vector2(xPos + width/2 - statSize.X/2, yPos + labelSize.Y + margin);
 
-            Utility.drawBoldText(b,label, Game1.dialogueFont,labelPos,Color.White);
-            Utility.drawBoldText(b,stat.ToString(), Game1.dialogueFont,statPos,Color.White);
+            if(label == "Reward")
+            {
+                Vector2 goldPos = new Vector2(xPos + width/2 - (statSize.X + 9*4+margin)/2, statPos.Y);
+                statPos.X = goldPos.X + (9*4+margin);
+                b.Draw(Game1.mouseCursors, goldPos, new Rectangle(408,476,9,11),Color.White,0,Vector2.Zero,new Vector2(4,4),SpriteEffects.None,0);
+            }
+            Utility.drawBoldText(b,label, Game1.dialogueFont,labelPos,Theme.HEADER_COLOR);
+            Utility.drawBoldText(b,stat.ToString(), Game1.dialogueFont,statPos,Theme.HEADER_COLOR);
         }
 
         private void drawNotInBankMessage(SpriteBatch b)
@@ -403,8 +395,8 @@ namespace StardewWordle
             Rectangle box = new Rectangle(boxXPos, boxYPos, BoxWidth, BoxHeight);
 
             Vector2 textPos = new Vector2(boxXPos + padding/2, boxYPos + padding/2);
-            Utility.DrawSquare(b,box,0,null,Config.DarkTheme ? Color.White : Color.Black);
-            Utility.drawBoldText(b, "Not in word list", Game1.smallFont, textPos, Config.DarkTheme ? Color.Black : Color.White);
+            Utility.DrawSquare(b,box,0,null,Theme.HEADER_COLOR);
+            Utility.drawBoldText(b, "Not in word list", Game1.smallFont, textPos, Theme.BACKGROUND);
         }
 
         public override void draw(SpriteBatch b)
@@ -432,7 +424,7 @@ namespace StardewWordle
         private Color[] DetermineGridBgColor(String guess)
         {
             String correctWord = getWordOfWeek().ToUpper();
-            Color[] colors = [GRAY,GRAY,GRAY,GRAY,GRAY];
+            Color[] colors = [Theme.TILE_GRAY,Theme.TILE_GRAY,Theme.TILE_GRAY,Theme.TILE_GRAY,Theme.TILE_GRAY];
             
             Dictionary<char,int> remainingCounts = new Dictionary<char, int>();
             for(int i = 0; i < correctWord.Length; i++ )
@@ -450,8 +442,7 @@ namespace StardewWordle
             {
                 if(guess[i] == correctWord[i])
                 {
-                    Monitor.Log("Matched " + guess[i], LogLevel.Debug);
-                    colors[i] = GREEN;
+                    colors[i] = Theme.TILE_GREEN;
                     remainingCounts[guess[i]]--;
                 }
             }
@@ -461,7 +452,7 @@ namespace StardewWordle
             {
                 if(guess[i] != correctWord[i] && correctWord.Contains(guess[i]) && remainingCounts[guess[i]] > 0)
                 {
-                    colors[i] = YELLOW;
+                    colors[i] = Theme.TILE_YELLOW;
                     remainingCounts[guess[i]]--;
                 }
             }
@@ -471,7 +462,7 @@ namespace StardewWordle
         private Color DetermineKeyBgColor(char key)
         {
             String correctWord = getWordOfWeek().ToUpper();
-            Color returnColor = LIGHTGRAY;
+            Color returnColor = Theme.KEYBOARD_BG;
 
             for(int i = 0; i < saveModel.Guesses.Count - 1; i++)
             {
@@ -486,13 +477,13 @@ namespace StardewWordle
                     {                        
                         if(guess[j] == correctWord[j])
                         {
-                            return GREEN;
+                            return Theme.TILE_GREEN;
                         } else if(correctWord.Contains(guess[j].ToString()))
                         {
-                            returnColor = YELLOW;
+                            returnColor = Theme.TILE_YELLOW;
                         } else
                         {
-                            returnColor = GRAY;
+                            returnColor = Theme.TILE_GRAY;
                         }
                     }
                 }
@@ -536,5 +527,7 @@ namespace StardewWordle
             }
             return "";
         }
+
     }
+   
 }
