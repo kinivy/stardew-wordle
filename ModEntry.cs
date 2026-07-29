@@ -104,7 +104,10 @@ namespace StardewWordle
             {
                 saveModel.Streak = 0;
                 this.Helper.Data.WriteSaveData("wordle-save-data", saveModel);
-                Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
+                if (Config.EnableNotifications)
+                {
+                    Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
+                }
             }
         }
 
@@ -145,7 +148,10 @@ namespace StardewWordle
 
             CodePatches.HasWonThisWeek = false;
 
-            Game1.addHUDMessage(new HUDMessage("A new Wordle game is available.", HUDMessage.achievement_type));
+            if(Config.EnableNotifications)
+            {
+                Game1.addHUDMessage(new HUDMessage("A new Wordle game is available.", HUDMessage.achievement_type));
+            }
         }
     }
     public class WordleDictionaryData

@@ -170,6 +170,11 @@ namespace StardewWordle
             this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
         }
 
+        private int determineReward()
+        {
+            return (int) (500 * Math.Pow(1.5, saveModel.Streak));
+        }
+
         private void removeLetter()
         {
             String guess = saveModel.Guesses[saveModel.Guesses.Count-1];
@@ -198,13 +203,16 @@ namespace StardewWordle
                     if (lastGuess.EqualsIgnoreCase(getWordOfWeek()))
                     {
                         saveModel.handleWin();
-                        int reward = (int) (500 * Math.Pow(1.25, saveModel.Streak));
+                        int reward = determineReward();
                         Game1.player.addUnearnedMoney(reward);
                     } else if(saveModel.Guesses.Count() == NUM_GUESSES)
                     {
                         saveModel.State = WordleState.LOST;
                         saveModel.Streak = 0;
-                        Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
+                        if (Config.EnableNotifications)
+                        {
+                            Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
+                        }
                     }
                     else
                     {
@@ -355,7 +363,7 @@ namespace StardewWordle
             int secondX = xPositionOnScreen + width/2 + xPadding;
             int firstY = GridRectangles.Last().Y + TILE_WIDTH + yPadding * 2;
             int secondY = firstY + yPadding + maxHeight;
-            int reward = (int) (500 * Math.Pow(1.25, saveModel.Streak));
+            int reward = determineReward();
             drawStat(b,"Reward", saveModel.State == WordleState.WON ? reward : 0, firstX, firstY, maxWidth);
             drawStat(b,"Total Wins", saveModel.TotalWins, firstX, secondY, maxWidth);
             drawStat(b,"Streak", saveModel.Streak, secondX, firstY, maxWidth);
@@ -446,7 +454,6 @@ namespace StardewWordle
                     remainingCounts[guess[i]]--;
                 }
             }
-
 
             for(int i = 0; i < guess.Length; i++)
             {
