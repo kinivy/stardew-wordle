@@ -43,6 +43,7 @@ namespace StardewWordle
             this.GridRectangles = initGrid();
             this.KeyboardMap = initKeyboard();
 
+
             Monitor.Log(getWordOfWeek(), LogLevel.Debug);
             Game1.keyboardDispatcher.Subscriber = new TextBox(null,null,Game1.smallFont,Theme.KEYBOARD_ACTIVE_TEXT);
         }
@@ -219,6 +220,15 @@ namespace StardewWordle
                         saveModel.Guesses.Add(""); // Start new guess
                     }
                     this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
+
+                    if(saveModel.State != WordleState.PLAYING)
+                    {
+                        CodePatches.updateTexture();
+                        if (ModEntry.UIInfoSuite2Loaded && ModEntry.Config.EnableUIInfoSuite2Integration)
+                        {
+                            UiInfoSuite2Compat.updateIcon();
+                        }
+                    }
                 } else
                 {
                     // not in word Bank

@@ -13,6 +13,7 @@ namespace StardewWordle
         internal static ModConfig Config;
         static string machineName = "kinivy_Wordle_WordleMachine";
         static string machineTexture = "Tilesheets/kinivy_Wordle_WordleMachine";
+        internal static bool UIInfoSuite2Loaded = false;
         public override void Entry(IModHelper helper)
         {
             Config = helper.ReadConfig<ModConfig>();
@@ -22,6 +23,18 @@ namespace StardewWordle
             helper.Events.Content.AssetRequested += OnAssetRequested;
 
             var harmony = new Harmony(this.ModManifest.UniqueID);
+
+            if (Helper.ModRegistry.IsLoaded("Annosz.UiInfoSuite2"))
+            {
+                UIInfoSuite2Loaded = true;
+                if(Config.EnableUIInfoSuite2Integration)
+                {
+                    new UiInfoSuite2Compat().Initialize(Monitor,helper,harmony,Config);
+                }
+            } else if (Config.EnableUIInfoSuite2Integration)
+            {
+                Monitor.Log("UIInfoSuite2 Integration Enabled but UIInfoSuite2 is not loaded.", LogLevel.Warn);
+            }
 
             CodePatches.Initialize(this.Monitor, helper, harmony, Config);
         }
@@ -56,10 +69,17 @@ namespace StardewWordle
 
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
         {
+            WordleSaveData saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
             if(Game1.dayOfMonth % 7 == 1)
             {
                 checkIfWordleStreakBroke();
                 weeklyReset();
+            }
+
+            CodePatches.updateTexture();
+            if (UIInfoSuite2Loaded && Config.EnableUIInfoSuite2Integration)
+            {
+                UiInfoSuite2Compat.updateIcon();
             }
         }
 
@@ -69,11 +89,8 @@ namespace StardewWordle
             if(saveModel == null)
             {
                 weeklyReset();
-                saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
             }
-            CodePatches.HasWonThisWeek = saveModel.HasWonThisWeek;
         }
-
 
         private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
         {
@@ -142,11 +159,15 @@ namespace StardewWordle
             saveModel.Guesses = new List<String>([""]);
             saveModel.Colors = new Color[6,5];
             saveModel.State = WordleState.PLAYING;
-            saveModel.HasWonThisWeek = false;
+            saveModel.Streak= 30;
             
             this.Helper.Data.WriteSaveData("wordle-save-data", saveModel);
 
-            CodePatches.HasWonThisWeek = false;
+            CodePatches.updateTexture();
+            if (UIInfoSuite2Loaded && Config.EnableUIInfoSuite2Integration)
+            {
+                UiInfoSuite2Compat.updateIcon();
+            }
 
             if(Config.EnableNotifications)
             {
@@ -169,7 +190,6 @@ namespace StardewWordle
         public int Streak {get; set;} = 0;
         public int MaxStreak {get; set;} = 0;
         public int TotalWins {get; set;} = 0;
-        public bool HasWonThisWeek {get; set;} = false;
         public void handleWin()
         {
             Streak++;
@@ -177,14 +197,16 @@ namespace StardewWordle
             {
                 MaxStreak = Streak;
             }
-            HasWonThisWeek = true;
-            CodePatches.HasWonThisWeek = true;
             TotalWins++;
             State = WordleState.WON;
         }
+        public bool IsWordleGameAvailable()
+        {
+            return State == WordleState.PLAYING;
+        }
     }
     public enum WordleState
-        {
+    {
         WON,
         LOST,
         PLAYING,

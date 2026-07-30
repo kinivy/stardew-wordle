@@ -1,9 +1,7 @@
-using System.Linq.Expressions;
-using System.Xml;
+
 using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Netcode;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Internal;
@@ -18,7 +16,7 @@ namespace StardewWordle
         static IModHelper Helper { get; set; }
         static string machineName = "kinivy_Wordle_WordleMachine";
         static TimeSpan machineAnimInterval = TimeSpan.FromMilliseconds(1000);
-        public static bool HasWonThisWeek = false;
+        public static bool ShowAlertTexture = true;
 
         public static void Initialize(IMonitor monitor, IModHelper helper, Harmony harmony, ModConfig config)
         {
@@ -45,11 +43,18 @@ namespace StardewWordle
             }
 		}
 
+        static public void updateTexture()
+        {
+            var saveModel = Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
+            ShowAlertTexture = saveModel.IsWordleGameAvailable();
+            Monitor.Log("CodePatches.updateTexture() - " + ShowAlertTexture, LogLevel.Debug);
+        }
+
         static void UpdateWhenLocation_Postfix(StardewValley.Object __instance, GameTime time)
 		{
 			if(__instance.itemId.Contains(machineName))
             {     
-                if (!HasWonThisWeek) 
+                if (ShowAlertTexture) 
                 {
                     long second = (long)(time.TotalGameTime.TotalMilliseconds / 1000);
                     int idx = (int) (second % 2);
