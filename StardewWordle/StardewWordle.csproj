@@ -5,7 +5,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <GameModsPath>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley\Mods Testing</GameModsPath>
+    <GameModsPath>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley\Mods Testing\StardewWordle</GameModsPath>
     <EnableHarmony>true</EnableHarmony>
   </PropertyGroup>
   <ItemGroup>

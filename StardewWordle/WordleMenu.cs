@@ -223,11 +223,8 @@ namespace StardewWordle
 
                     if(saveModel.State != WordleState.PLAYING)
                     {
-                        CodePatches.updateTexture();
-                        if (ModEntry.UIInfoSuite2Loaded && ModEntry.Config.EnableUIInfoSuite2Integration)
-                        {
-                            UiInfoSuite2Compat.updateIcon();
-                        }
+                        ModEntry.WordleGameAvailable = false;
+                        ModEntry.UpdateSaloonMachineAnimation();
                     }
                 } else
                 {

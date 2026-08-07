@@ -1,0 +1,12 @@
+{
+  "Name": "[CP] Stardew Wordle",
+  "Author": "kinivy",
+  "Version": "1.0.0",
+  "Description": "",
+  "UniqueID": "kinivy.StardewWordle.CP",
+  "MinimumApiVersion": "4.0.0",
+  "UpdateKeys": [ ],
+  "ContentPackFor": {
+    "UniqueID": "Pathoschild.ContentPatcher"
+  }
+}

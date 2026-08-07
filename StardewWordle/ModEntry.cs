@@ -3,9 +3,8 @@ using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using Microsoft.Xna.Framework;
-using StardewValley.GameData.BigCraftables;
-using Microsoft.Xna.Framework.Graphics;
-
+using xTile.Tiles;
+using xTile.Layers;
 namespace StardewWordle
 {
     public class ModEntry : Mod
@@ -14,13 +13,16 @@ namespace StardewWordle
         static string machineName = "kinivy_Wordle_WordleMachine";
         static string machineTexture = "Tilesheets/kinivy_Wordle_WordleMachine";
         internal static bool UIInfoSuite2Loaded = false;
+        internal static bool WordleGameAvailable = false; //used to show alert texture & UIInfoSuite icon
+        private static Tile originalMachineTile;
         public override void Entry(IModHelper helper)
         {
             Config = helper.ReadConfig<ModConfig>();
             helper.Events.GameLoop.GameLaunched += OnGameLaunched;
             helper.Events.GameLoop.DayStarted += OnDayStarted;
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
-            helper.Events.Content.AssetRequested += OnAssetRequested;
+            helper.Events.Player.Warped += onWarped;
+            GameLocation.RegisterTileAction("WordleMenu", this.OpenWordleMenu);
 
             var harmony = new Harmony(this.ModManifest.UniqueID);
 
@@ -39,32 +41,11 @@ namespace StardewWordle
             CodePatches.Initialize(this.Monitor, helper, harmony, Config);
         }
 
-        private void OnAssetRequested(object? sender, AssetRequestedEventArgs e)
+        private bool OpenWordleMenu(GameLocation location, string[] args, Farmer player, Microsoft.Xna.Framework.Point point)
         {
-            if(e.Name.IsEquivalentTo("Data/BigCraftables"))
-            {
-                e.Edit((IAssetData data) =>
-                {
-                    var dict = data.GetData<Dictionary<string, BigCraftableData>>();
-                    dict[machineName] = new()
-                    {
-                        Name = machineName,
-                        DisplayName = "Wordle Arcade Machine",
-                        Description = "asdf",
-                        Fragility = 0,
-                        CanBePlacedOutdoors = true,
-                        CanBePlacedIndoors = true,
-                        IsLamp = false,
-                        Price = 0,
-						SpriteIndex = 0,
-                        Texture = machineTexture,
-                    };
-                });
-			} 
-            else if (e.Name.IsEquivalentTo(machineTexture))
-            {
-                e.LoadFromModFile<Texture2D>("Assets/Machine.png", AssetLoadPriority.Medium);
-            }
+            Monitor.Log("Test", LogLevel.Debug);
+            Game1.activeClickableMenu = new WordleMenu(Helper, Monitor);
+            return true;
         }
 
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
@@ -74,12 +55,9 @@ namespace StardewWordle
             {
                 checkIfWordleStreakBroke();
                 weeklyReset();
-            }
-
-            CodePatches.updateTexture();
-            if (UIInfoSuite2Loaded && Config.EnableUIInfoSuite2Integration)
+            } else
             {
-                UiInfoSuite2Compat.updateIcon();
+                WordleGameAvailable = saveModel.IsWordleGameAvailable();
             }
         }
 
@@ -89,6 +67,35 @@ namespace StardewWordle
             if(saveModel == null)
             {
                 weeklyReset();
+            }
+        }
+
+        private void onWarped(object? sender, WarpedEventArgs e)
+        {
+            if(e.NewLocation.Name == "Saloon")
+            {
+                UpdateSaloonMachineAnimation();
+            }
+        }
+
+        internal static void UpdateSaloonMachineAnimation()
+        {
+            GameLocation location = Game1.currentLocation;
+
+            if(location == null || location.Name != "Saloon") return;
+            Layer layer = location.Map.GetLayer("Front");
+            Tile tile = layer.Tiles[34,16];
+
+            if(!WordleGameAvailable)
+            {
+                if(tile is AnimatedTile animatedTile)
+                {
+                    originalMachineTile = animatedTile;
+                    layer.Tiles[34,16] = animatedTile.TileFrames[0];
+                }
+            } else if (originalMachineTile != null)
+            {
+                layer.Tiles[34,16] = originalMachineTile;
             }
         }
 
@@ -159,15 +166,11 @@ namespace StardewWordle
             saveModel.Guesses = new List<String>([""]);
             saveModel.Colors = new Color[6,5];
             saveModel.State = WordleState.PLAYING;
-            saveModel.Streak= 30;
             
             this.Helper.Data.WriteSaveData("wordle-save-data", saveModel);
 
-            CodePatches.updateTexture();
-            if (UIInfoSuite2Loaded && Config.EnableUIInfoSuite2Integration)
-            {
-                UiInfoSuite2Compat.updateIcon();
-            }
+
+            WordleGameAvailable = saveModel.IsWordleGameAvailable();
 
             if(Config.EnableNotifications)
             {

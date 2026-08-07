@@ -19,7 +19,6 @@ namespace StardewWordle
         ClickableTextureComponent IconComponent { get; set; }
         static Rectangle SpriteLocation= new Rectangle(0,0,12,12);
         String HoverText = "A new Wordle game is available!";
-        public static bool WordleGameAvailable = false;
 
         public void Initialize(IMonitor monitor, IModHelper helper, Harmony harmony, ModConfig config)
         {
@@ -30,16 +29,9 @@ namespace StardewWordle
             Helper = helper;
         }
 
-        public static void updateIcon()
-        {
-            var saveModel = Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
-            WordleGameAvailable = saveModel.IsWordleGameAvailable();
-            Monitor.Log("Compat.updateIcon() - " + WordleGameAvailable, LogLevel.Debug);
-        }
-
         private void OnRenderingHud(object? sender, RenderingHudEventArgs e)
         {
-            if (!WordleGameAvailable || !UInfoSuite2_IsRenderingNormally()) return;
+            if (!ModEntry.WordleGameAvailable || !UInfoSuite2_IsRenderingNormally()) return;
 
             Point? pos = UIInfoSuite2_GetNewIconPosition();
             if (pos.HasValue)
@@ -59,7 +51,7 @@ namespace StardewWordle
 
         private void OnRenderedHud(object? sender, RenderedHudEventArgs e)
         {
-            if (!WordleGameAvailable || !UInfoSuite2_IsRenderingNormally()) return;
+            if (!ModEntry.WordleGameAvailable || !UInfoSuite2_IsRenderingNormally()) return;
 
             bool hasMouse = IconComponent?.containsPoint(Game1.getMouseX(), Game1.getMouseY()) ?? false;
             if (hasMouse)
@@ -84,6 +76,7 @@ namespace StardewWordle
                 return false;
             }
         }
+
         private Point? UIInfoSuite2_GetNewIconPosition()
         {
             try

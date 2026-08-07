@@ -1,0 +1,46 @@
+{
+    "Format": "2.9.0",
+    "Changes": [
+        {
+            "Action": "Load",
+            "Target": "Tilesheets/kinivy_Wordle_WordleMachine",
+            "FromFile": "assets/Machine.png"
+        },
+        {
+            "Action": "EditData",
+            "Target": "Data/BigCraftables",
+            "Entries": {
+                "kinivy_Wordle_WordleMachine": {
+                    "Name": "kinivy_Wordle_WordleMachine",
+                    "DisplayName": "Wordle Arcade Machine",
+                    "Description": "asdf",
+                    "Fragility": 0,
+                    "CanBePlacedOutdoors": true,
+                    "CanBePlacedIndoors": true,
+                    "IsLamp": false,
+                    "Price": 0,
+                    "SpriteIndex": 0,
+                    "Texture": "Tilesheets/kinivy_Wordle_WordleMachine"
+                }
+            }
+        },
+{
+            "Action": "EditMap",
+            "Target": "Maps/Saloon",
+            "FromFile": "assets/Saloon_Wordle.tmx",
+            "PatchMode": "Overlay",
+            "FromArea": {
+                "X": 34,
+                "Y": 16,
+                "Width": 1,
+                "Height": 2
+            },
+            "ToArea": {
+                "X": 34,
+                "Y": 16,
+                "Width": 1,
+                "Height": 2
+            }
+        }
+    ]
+}
