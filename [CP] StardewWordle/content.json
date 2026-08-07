@@ -13,7 +13,7 @@
                 "kinivy_Wordle_WordleMachine": {
                     "Name": "kinivy_Wordle_WordleMachine",
                     "DisplayName": "Wordle Arcade Machine",
-                    "Description": "asdf",
+                    "Description": "Play 'Wordle' at home!",
                     "Fragility": 0,
                     "CanBePlacedOutdoors": true,
                     "CanBePlacedIndoors": true,
@@ -24,7 +24,47 @@
                 }
             }
         },
-{
+        {
+            "Action": "EditData",
+            "Target": "Data/Mail",
+            "Entries": {
+                "kinivy_Wordle_GusWordleMail": "Congrats, @!^You were the first in the valley to get a streak of 4 on Wordle.^As promised, here is the extra machine I was sent. Make good use of it!^^-Gus%item id kinivy_Wordle_WordleMachine 1 %%"
+            }
+        },
+        {
+            "Action": "EditData",
+            "Target": "Data/Quests",
+            "Entries": {
+                "kinivy_Wordle_WordleQuest": "Basic/May The Best Wordler Win/A new wordle machine has arrived in the saloon! Gus received an extra machine he doesn't need. He will award it to the first person to get a Wordle streak of 4!/Get a Wordle streak of 4./-1/-1/1000/-1/false"
+            }
+        },
+        {
+            "Action": "EditData",
+            "Target": "Data/Events/Farm",
+            "Entries": {
+                "kinivy_Wordle_WordleIntro/DaysPlayed 4": "
+                continue/
+                64 15/
+                farmer 64 15 2
+                Gus 64 18 0/
+                pause 1000/
+                speak Gus \"Hi @! Good morning.\"/
+                pause 800/
+                speak Gus \"There's a new hit arcade machine everyone is talking about called Wordle.\"/
+                pause 800/
+                speak Gus \"I ordered a machine for the saloon, but they sent me two! I guess today is my lucky day.\"/
+                pause 800/
+                speak Gus \"Anyways..a new wordle game becomes available every Monday. Each time a wordle is solved, you win prize money! The higher your streak, the more money you get.\"/
+                pause 800/
+                speak Gus \"I've decided that the first person to get a streak of 4 weeks in a row will get the extra machine!\"/
+                pause 800/
+                speak Gus \"Best of luck. Have a good one!\"/
+                pause 500/
+                addQuest kinivy_Wordle_WordleQuest/
+                end"
+            }
+        },
+        {
             "Action": "EditMap",
             "Target": "Maps/Saloon",
             "FromFile": "assets/Saloon_Wordle.tmx",
@@ -40,6 +80,9 @@
                 "Y": 16,
                 "Width": 1,
                 "Height": 2
+            },
+            "When": {
+                "query: {{DaysPlayed}} >= 4": true
             }
         }
     ]

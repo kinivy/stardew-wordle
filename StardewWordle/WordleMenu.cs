@@ -206,6 +206,11 @@ namespace StardewWordle
                         saveModel.handleWin();
                         int reward = determineReward();
                         Game1.player.addUnearnedMoney(reward);
+                        if(Game1.player.hasQuest("kinivy_Wordle_WordleQuest") && saveModel.MaxStreak >= 4)
+                        {
+                            Game1.player.completeQuest("kinivy_Wordle_WordleQuest");
+                            Game1.addMailForTomorrow("kinivy_Wordle_GusWordleMail");
+                        }
                     } else if(saveModel.Guesses.Count() == NUM_GUESSES)
                     {
                         saveModel.State = WordleState.LOST;
