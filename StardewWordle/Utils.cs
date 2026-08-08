@@ -16,6 +16,7 @@ namespace StardewWordle
 {
         internal static bool WordleGameAvailable = false; //used to show alert texture & UIInfoSuite icon
         private static Tile originalMachineTile;
+        internal static IModHelper Helper;
 
         internal static void UpdateSaloonMachineAnimation()
         {
@@ -38,15 +39,42 @@ namespace StardewWordle
             }
         }
 
-        internal static string SaveKey()
+        internal static string SaveKey(long playerId=-1)
         {
             if(ModEntry.Config.MultiplayerMode == MultiplayerMode.Individual)
             {
-                return "wordle-save-data-" + Game1.player.UniqueMultiplayerID;
+                return "wordle-save-data-" + playerId;
             } else
             {
-                return "wordle-save-data";
+                return "wordle-save-data-shared";
             }
+        }
+
+        internal static long GetHostId()
+        {
+            if (Game1.IsMasterGame)
+            {
+                return Game1.player.UniqueMultiplayerID;
+            }
+            foreach (IMultiplayerPeer peer in Helper.Multiplayer.GetConnectedPlayers())
+            {
+                if (peer.IsHost)
+                {
+                  return peer.PlayerID;
+                }
+            }
+            return -1;
+        }
+
+        internal static List<long> getAllPlayerIDs()
+        {
+            List<long> ids = new List<long>();
+            foreach (IMultiplayerPeer peer in Helper.Multiplayer.GetConnectedPlayers())
+            {
+                ids.Add(peer.PlayerID);
+            }         
+            ids.Add(Game1.player.UniqueMultiplayerID);
+            return ids;
         }
     }
 
@@ -86,5 +114,14 @@ namespace StardewWordle
         LOST,
         PLAYING,
         MENU
+    }
+
+    public class MessageType
+    {
+        public static string SEND_STATE = "StardewWordle_SendState";
+        public static string REQUEST_STATE = "StardewWordle_RequestState";
+        public static string STREAK_LOST = "StardewWordle_StreakLost";
+        public static string GAME_AVAILABLE = "StardewWordle_GameAvailable";
+        public static string MODE_SYNC = "StardewWordle_ModeSync";
     }
 }

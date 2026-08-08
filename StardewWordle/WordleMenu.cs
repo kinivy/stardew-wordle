@@ -36,23 +36,14 @@ namespace StardewWordle
             this.helper = helper;
             this.Monitor = monitor;
             this.Config = helper.ReadConfig<ModConfig>();
-            if(Game1.IsMasterGame)
+            if (Game1.IsMasterGame)
             {
-                this.saveModel = this.helper.Data.ReadSaveData<WordleSaveData>(Utils.SaveKey());
+                this.saveModel = this.helper.Data.ReadSaveData<WordleSaveData>(Utils.SaveKey(Game1.player.UniqueMultiplayerID));
             }
-
-            //Request Sync
-            if(!Game1.IsMasterGame && Config.MultiplayerMode == MultiplayerMode.Synchronous)
+            else
             {
-                //Request state from host.
-                foreach (IMultiplayerPeer peer in helper.Multiplayer.GetConnectedPlayers())
-                {
-                    if (peer.IsHost)
-                    {
-                        Monitor.Log("WordleMenu: Requesting State from " + peer.PlayerID, LogLevel.Debug);
-                        helper.Multiplayer.SendMessage("", "StardewWordle_RequestState", modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {peer.PlayerID});
-                    }
-                }
+                long hostId = Utils.GetHostId();
+                helper.Multiplayer.SendMessage("", MessageType.REQUEST_STATE, modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {hostId});
 
                 this.saveModel = new WordleSaveData(); //placeholder until message comes back.
             }
@@ -69,7 +60,7 @@ namespace StardewWordle
 
         public void Sync(WordleSaveData saveData)
         {
-            this.saveModel = saveData;
+            this.saveModel = saveData ?? new WordleSaveData();
         }
 
         private Rectangle[] initGrid()
@@ -235,6 +226,7 @@ namespace StardewWordle
                         if(Game1.player.hasQuest("kinivy_Wordle_WordleQuest") && saveModel.MaxStreak >= 4)
                         {
                             Game1.player.completeQuest("kinivy_Wordle_WordleQuest");
+                            //IF SYNCHRONOUS COMPLETE FOR ALL
                             Game1.addMailForTomorrow("kinivy_Wordle_GusWordleMail");
                         }
                     } else if(saveModel.Guesses.Count() == NUM_GUESSES)
@@ -271,6 +263,9 @@ namespace StardewWordle
 
         private void updateColors()
         {
+            if (saveModel == null || saveModel.Guesses == null || saveModel.Guesses.Count == 0)
+                return;
+
             String guess = saveModel.Guesses.Last();
             Color[] guessColors = DetermineGridBgColor(guess);
             for(int i = 0; i < GUESS_LENGTH; i++)
@@ -281,20 +276,19 @@ namespace StardewWordle
 
         private void writeOrSyncData()
         {
-            if(Config.MultiplayerMode == MultiplayerMode.Individual || Game1.IsMasterGame)
+            if(Game1.IsMasterGame)
             {
-                this.helper.Data.WriteSaveData(Utils.SaveKey(), saveModel);
+                this.helper.Data.WriteSaveData(Utils.SaveKey(Game1.player.UniqueMultiplayerID), saveModel);
+            } else if(Config.MultiplayerMode == MultiplayerMode.Individual)
+            {
+                //Send individual data to host to write.
+                helper.Multiplayer.SendMessage(saveModel, MessageType.SEND_STATE, modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {Utils.GetHostId()});
             }
             
             if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
             {
-                //Send state to all other players
-                //if (helper.Multiplayer.GetConnectedPlayer(Game1.player.UniqueMultiplayerID).IsHost)
-                //{
-                
                 Monitor.Log("writeOrSync: Sending state.", LogLevel.Debug);
-                helper.Multiplayer.SendMessage(saveModel, "StardewWordle_State", modIDs: new[] { "kinivy.StardewWordle" });
-                //}
+                helper.Multiplayer.SendMessage(saveModel, MessageType.SEND_STATE, modIDs: new[] { "kinivy.StardewWordle" });
             }
         }
 
