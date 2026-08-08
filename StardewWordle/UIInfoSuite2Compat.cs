@@ -1,6 +1,5 @@
 
 using System.Reflection;
-using System.Security.Principal;
 using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -31,7 +30,7 @@ namespace StardewWordle
 
         private void OnRenderingHud(object? sender, RenderingHudEventArgs e)
         {
-            if (!ModEntry.WordleGameAvailable || !UInfoSuite2_IsRenderingNormally()) return;
+            if (!Utils.WordleGameAvailable || !UInfoSuite2_IsRenderingNormally()) return;
 
             Point? pos = UIInfoSuite2_GetNewIconPosition();
             if (pos.HasValue)
@@ -51,7 +50,7 @@ namespace StardewWordle
 
         private void OnRenderedHud(object? sender, RenderedHudEventArgs e)
         {
-            if (!ModEntry.WordleGameAvailable || !UInfoSuite2_IsRenderingNormally()) return;
+            if (!Utils.WordleGameAvailable || !UInfoSuite2_IsRenderingNormally()) return;
 
             bool hasMouse = IconComponent?.containsPoint(Game1.getMouseX(), Game1.getMouseY()) ?? false;
             if (hasMouse)

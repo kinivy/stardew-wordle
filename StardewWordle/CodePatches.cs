@@ -46,7 +46,7 @@ namespace StardewWordle
 		{
 			if(__instance.itemId.Contains(machineName))
             {     
-                if (ModEntry.WordleGameAvailable) 
+                if (Utils.WordleGameAvailable) 
                 {
                     long second = (long)(time.TotalGameTime.TotalMilliseconds / 1000);
                     int idx = (int) (second % 2);

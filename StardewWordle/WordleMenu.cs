@@ -35,17 +35,41 @@ namespace StardewWordle
         {
             this.helper = helper;
             this.Monitor = monitor;
-            this.saveModel = this.helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
-            this.dictionaryModel = this.helper.Data.ReadGlobalData<WordleDictionaryData>("wordle-dictionary-data");
             this.Config = helper.ReadConfig<ModConfig>();
+            if(Game1.IsMasterGame)
+            {
+                this.saveModel = this.helper.Data.ReadSaveData<WordleSaveData>(Utils.SaveKey());
+            }
+
+            //Request Sync
+            if(!Game1.IsMasterGame && Config.MultiplayerMode == MultiplayerMode.Synchronous)
+            {
+                //Request state from host.
+                foreach (IMultiplayerPeer peer in helper.Multiplayer.GetConnectedPlayers())
+                {
+                    if (peer.IsHost)
+                    {
+                        Monitor.Log("WordleMenu: Requesting State from " + peer.PlayerID, LogLevel.Debug);
+                        helper.Multiplayer.SendMessage("", "StardewWordle_RequestState", modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {peer.PlayerID});
+                    }
+                }
+
+                this.saveModel = new WordleSaveData(); //placeholder until message comes back.
+            }
+
+            this.dictionaryModel = this.helper.Data.ReadGlobalData<WordleDictionaryData>("wordle-dictionary-data");
             this.Theme = new WordleTheme(Config.DarkTheme);
 
             this.GridRectangles = initGrid();
             this.KeyboardMap = initKeyboard();
 
-
             Monitor.Log(getWordOfWeek(), LogLevel.Debug);
             Game1.keyboardDispatcher.Subscriber = new TextBox(null,null,Game1.smallFont,Theme.KEYBOARD_ACTIVE_TEXT);
+        }
+
+        public void Sync(WordleSaveData saveData)
+        {
+            this.saveModel = saveData;
         }
 
         private Rectangle[] initGrid()
@@ -168,7 +192,8 @@ namespace StardewWordle
             {
                 saveModel.Guesses[saveModel.Guesses.Count-1] += key.ToUpper();
             }
-            this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
+
+            writeOrSyncData();
         }
 
         private int determineReward()
@@ -183,7 +208,8 @@ namespace StardewWordle
             {
                 Game1.playSound("clubhit", null);
                 saveModel.Guesses[saveModel.Guesses.Count-1]= saveModel.Guesses[saveModel.Guesses.Count-1][..^1];
-                this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
+                
+                writeOrSyncData();
             }
         }
 
@@ -224,12 +250,12 @@ namespace StardewWordle
                     {
                         saveModel.Guesses.Add(""); // Start new guess
                     }
-                    this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
+                    writeOrSyncData();
 
                     if(saveModel.State != WordleState.PLAYING)
                     {
-                        ModEntry.WordleGameAvailable = false;
-                        ModEntry.UpdateSaloonMachineAnimation();
+                        Utils.WordleGameAvailable = false;
+                        Utils.UpdateSaloonMachineAnimation();
                     }
                 } else
                 {
@@ -238,6 +264,8 @@ namespace StardewWordle
                     Monitor.Log("Not in word bank.", LogLevel.Debug);
                     Game1.playSound("fishEscape", null);
                 }
+
+                
             }   
         }
 
@@ -249,7 +277,25 @@ namespace StardewWordle
             {
                 saveModel.Colors[saveModel.Guesses.Count()-1, i] = guessColors[i];
             }
-            this.helper.Data.WriteSaveData("wordle-save-data", saveModel);
+        }
+
+        private void writeOrSyncData()
+        {
+            if(Config.MultiplayerMode == MultiplayerMode.Individual || Game1.IsMasterGame)
+            {
+                this.helper.Data.WriteSaveData(Utils.SaveKey(), saveModel);
+            }
+            
+            if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
+            {
+                //Send state to all other players
+                //if (helper.Multiplayer.GetConnectedPlayer(Game1.player.UniqueMultiplayerID).IsHost)
+                //{
+                
+                Monitor.Log("writeOrSync: Sending state.", LogLevel.Debug);
+                helper.Multiplayer.SendMessage(saveModel, "StardewWordle_State", modIDs: new[] { "kinivy.StardewWordle" });
+                //}
+            }
         }
 
         public override void receiveLeftClick(int x, int y, bool playSound = true)

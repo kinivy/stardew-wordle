@@ -13,15 +13,14 @@ namespace StardewWordle
         static string machineName = "kinivy_Wordle_WordleMachine";
         static string machineTexture = "Tilesheets/kinivy_Wordle_WordleMachine";
         internal static bool UIInfoSuite2Loaded = false;
-        internal static bool WordleGameAvailable = false; //used to show alert texture & UIInfoSuite icon
-        private static Tile originalMachineTile;
         public override void Entry(IModHelper helper)
         {
             Config = helper.ReadConfig<ModConfig>();
             helper.Events.GameLoop.GameLaunched += OnGameLaunched;
             helper.Events.GameLoop.DayStarted += OnDayStarted;
-            helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.Player.Warped += onWarped;
+            helper.Events.Multiplayer.ModMessageReceived += OnModMessageReceived;
+            helper.Events.Multiplayer.PeerConnected += OnPeerConnected;
             GameLocation.RegisterTileAction("WordleMenu", this.OpenWordleMenu);
 
             var harmony = new Harmony(this.ModManifest.UniqueID);
@@ -43,30 +42,43 @@ namespace StardewWordle
 
         private bool OpenWordleMenu(GameLocation location, string[] args, Farmer player, Microsoft.Xna.Framework.Point point)
         {
-            Monitor.Log("Test", LogLevel.Debug);
             Game1.activeClickableMenu = new WordleMenu(Helper, Monitor);
             return true;
         }
 
-        private void OnDayStarted(object? sender, DayStartedEventArgs e)
+        private void OnPeerConnected(object? sender, PeerConnectedEventArgs e)
         {
-            WordleSaveData saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
-            if(Game1.dayOfMonth % 7 == 1)
+            if (Game1.IsMasterGame)
             {
-                checkIfWordleStreakBroke();
-                weeklyReset();
-            } else
-            {
-                WordleGameAvailable = saveModel.IsWordleGameAvailable();
+                Monitor.Log("Host Sending State to " + e.Peer.PlayerID, LogLevel.Debug);
+                WordleSaveData saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>(Utils.SaveKey());
+                Helper.Multiplayer.SendMessage(saveModel, "StardewWordle_State", modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {e.Peer.PlayerID});
             }
         }
 
-        private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
+        private void OnDayStarted(object? sender, DayStartedEventArgs e)
         {
-            var saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
-            if(saveModel == null)
+            if (Game1.IsMasterGame)
             {
-                weeklyReset();
+                WordleSaveData saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>(Utils.SaveKey());
+                if(saveModel == null)
+                {
+                    weeklyReset();
+                }else if(Game1.dayOfMonth % 7 == 1)
+                {
+                    checkIfWordleStreakBroke();
+                    weeklyReset();
+                } else
+                {
+                    Utils.WordleGameAvailable = saveModel.IsWordleGameAvailable();
+                }
+
+                if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
+                {
+                    //Send data to other players.
+                    Monitor.Log("Host Sending State.", LogLevel.Debug);
+                    Helper.Multiplayer.SendMessage(saveModel, "StardewWordle_State", modIDs: new[] { "kinivy.StardewWordle" });
+                }
             }
         }
 
@@ -74,28 +86,40 @@ namespace StardewWordle
         {
             if(e.NewLocation.Name == "Saloon")
             {
-                UpdateSaloonMachineAnimation();
+                Utils.UpdateSaloonMachineAnimation();
             }
         }
 
-        internal static void UpdateSaloonMachineAnimation()
+        private void OnModMessageReceived(object? sender, ModMessageReceivedEventArgs e)
         {
-            GameLocation location = Game1.currentLocation;
-
-            if(location == null || location.Name != "Saloon") return;
-            Layer layer = location.Map.GetLayer("Front");
-            Tile tile = layer.Tiles[34,16];
-
-            if(!WordleGameAvailable)
+            if(e.Type == "StardewWordle_State")
             {
-                if(tile is AnimatedTile animatedTile)
+                Monitor.Log("OnMessageReceived: Received State.", LogLevel.Debug);
+                WordleSaveData state = e.ReadAs<WordleSaveData>();
+                if(Game1.activeClickableMenu != null && Game1.activeClickableMenu is WordleMenu menu)
                 {
-                    originalMachineTile = animatedTile;
-                    layer.Tiles[34,16] = animatedTile.TileFrames[0];
+                    Monitor.Log("OnMessageReceived: Syncing menu.", LogLevel.Debug);
+                    menu.Sync(state);
                 }
-            } else if (originalMachineTile != null)
+                Utils.WordleGameAvailable = state.IsWordleGameAvailable();
+                Utils.UpdateSaloonMachineAnimation();
+
+                if (Game1.IsMasterGame)
+                {
+                    Monitor.Log("OnMessageReceived: Host Writing State.", LogLevel.Debug);
+                    this.Helper.Data.WriteSaveData(Utils.SaveKey(), state);
+                }
+            } else if(e.Type == "StardewWordle_RequestState" && Game1.IsMasterGame)
             {
-                layer.Tiles[34,16] = originalMachineTile;
+                Monitor.Log("OnMessageReceived: Host received state request. Sending.", LogLevel.Debug);
+                WordleSaveData saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>(Utils.SaveKey());
+                Helper.Multiplayer.SendMessage(saveModel, "StardewWordle_State", modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {e.FromPlayerID});
+            } else if(e.Type == "StardewWordle_StreakLost" && Config.EnableNotifications)
+            {
+                Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
+            } else if(e.Type == "StardewWordle_NewGame" && Config.EnableNotifications)
+            {
+                Game1.addHUDMessage(new HUDMessage("A new Wordle game is available.", HUDMessage.achievement_type));
             }
         }
 
@@ -119,18 +143,47 @@ namespace StardewWordle
                 getValue: () => Config.DarkTheme,
                 setValue: value => Config.DarkTheme = value
             );
+
+            configMenu.AddBoolOption(
+                mod: this.ModManifest,
+                name: () => "Enable HUD Notifications",
+                getValue: () => Config.EnableNotifications,
+                setValue: value => Config.EnableNotifications = value
+            );
+
+            configMenu.AddBoolOption(
+                mod: this.ModManifest,
+                name: () => "Enable UIInfoSuite2 Integration",
+                tooltip: () => "A Wordle Icon will appear in the top right icon list whenever a game is available.",
+                getValue: () => Config.EnableUIInfoSuite2Integration,
+                setValue: value => Config.EnableUIInfoSuite2Integration = value
+            );
+
+            configMenu.AddTextOption(
+                mod: this.ModManifest,
+                name: () => "Multiplayer Mode",
+                getValue: () => Config.MultiplayerMode.ToString(),
+                setValue: value =>
+                {
+                    Enum.TryParse(value, out MultiplayerMode mode);
+                    Config.MultiplayerMode = mode;
+                },
+                allowedValues: new string[] { "Synchronous", "Individual"}
+            );
 		}
 
         private void checkIfWordleStreakBroke()
         {
-            var saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
+            //Always ran by Host.
+            var saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>(Utils.SaveKey());
             if(saveModel.Streak > 0 && saveModel.State != WordleState.WON)
             {
                 saveModel.Streak = 0;
-                this.Helper.Data.WriteSaveData("wordle-save-data", saveModel);
+                this.Helper.Data.WriteSaveData(Utils.SaveKey(), saveModel);
                 if (Config.EnableNotifications)
                 {
                     Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
+                    Helper.Multiplayer.SendMessage(saveModel, "StardewWordle_StreakLost", modIDs: new[] { "kinivy.StardewWordle" });
                 }
             }
         }
@@ -151,10 +204,11 @@ namespace StardewWordle
 
         private void weeklyReset()
         {
+            //Always ran by host.
             var dictionaryModel = this.Helper.Data.ReadGlobalData<WordleDictionaryData>("wordle-dictionary-data");
             string[] words = dictionaryModel.PossibleWords;
 
-            var saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>("wordle-save-data");
+            var saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>(Utils.SaveKey());
             if(saveModel == null)
             {
                 saveModel = new WordleSaveData();
@@ -167,52 +221,14 @@ namespace StardewWordle
             saveModel.Colors = new Color[6,5];
             saveModel.State = WordleState.PLAYING;
             
-            this.Helper.Data.WriteSaveData("wordle-save-data", saveModel);
+            this.Helper.Data.WriteSaveData(Utils.SaveKey(), saveModel);
 
-
-            WordleGameAvailable = saveModel.IsWordleGameAvailable();
+            Utils.WordleGameAvailable = saveModel.IsWordleGameAvailable();
 
             if(Config.EnableNotifications)
             {
                 Game1.addHUDMessage(new HUDMessage("A new Wordle game is available.", HUDMessage.achievement_type));
             }
         }
-    }
-    public class WordleDictionaryData
-    {
-        public String[] PossibleGuesses {get; set;}
-        public String[] PossibleWords {get; set;}
-    }
-
-    public class WordleSaveData
-    {
-        public String WordOfWeek {get; set;} = "";
-        public List<String> Guesses {get; set;} = new List<String>([""]);
-        public Color[,] Colors {get; set;} = new Color[6,5];
-        public WordleState State {get; set;} = WordleState.PLAYING;
-        public int Streak {get; set;} = 0;
-        public int MaxStreak {get; set;} = 0;
-        public int TotalWins {get; set;} = 0;
-        public void handleWin()
-        {
-            Streak++;
-            if(MaxStreak < Streak)
-            {
-                MaxStreak = Streak;
-            }
-            TotalWins++;
-            State = WordleState.WON;
-        }
-        public bool IsWordleGameAvailable()
-        {
-            return State == WordleState.PLAYING;
-        }
-    }
-    public enum WordleState
-    {
-        WON,
-        LOST,
-        PLAYING,
-        MENU
     }
 }
