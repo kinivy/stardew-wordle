@@ -163,6 +163,12 @@ namespace StardewWordle
                 {
                     menu.exitThisMenu();
                 }
+            } else if(e.Type == MessageType.PLAY_ANIM)
+            {
+                if(Game1.activeClickableMenu != null && Game1.activeClickableMenu is WordleMenu menu)
+                {
+                    menu.playAnim();
+                }
             }
         }
 
@@ -226,18 +232,16 @@ namespace StardewWordle
             {
                 saveData.Streak = 0;
                 this.Helper.Data.WriteSaveData(Utils.SaveKey(saveId), saveData);
-                if (Config.EnableNotifications)
+                if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
                 {
-                    Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
-                    if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
-                    {
-                        Helper.Multiplayer.SendMessage("", MessageType.STREAK_LOST, modIDs: new[] { "kinivy.StardewWordle" });
-                    } else
-                    {
-                        Helper.Multiplayer.SendMessage("", MessageType.STREAK_LOST, modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {saveId});
-                    }
+                    if (Config.EnableNotifications) Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
+                    Helper.Multiplayer.SendMessage("", MessageType.STREAK_LOST, modIDs: new[] { "kinivy.StardewWordle" });
+                } else
+                {
+                    if(Game1.player.UniqueMultiplayerID == saveId && Config.EnableNotifications) Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
+                    Helper.Multiplayer.SendMessage("", MessageType.STREAK_LOST, modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {saveId});
                 }
-            }
+        }
         }
 
         private void initializeWordleDictionaryData()
@@ -273,11 +277,15 @@ namespace StardewWordle
             saveData.State = WordleState.PLAYING;
             
             this.Helper.Data.WriteSaveData(Utils.SaveKey(playerId), saveData);
-
-            if(Config.EnableNotifications)
+            if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
             {
-                Game1.addHUDMessage(new HUDMessage("A new Wordle game is available.", HUDMessage.achievement_type));
-            }
+                if (Config.EnableNotifications) Game1.addHUDMessage(new HUDMessage("A new Wordle game is available.", HUDMessage.achievement_type));
+                Helper.Multiplayer.SendMessage("", MessageType.GAME_AVAILABLE, modIDs: new[] { "kinivy.StardewWordle" });
+            } else
+            {
+                if(Game1.player.UniqueMultiplayerID == playerId && Config.EnableNotifications) Game1.addHUDMessage(new HUDMessage("A new Wordle game is available.", HUDMessage.achievement_type));
+                Helper.Multiplayer.SendMessage("", MessageType.STREAK_LOST, modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {playerId});
+            }   
             return saveData;
         }
     }

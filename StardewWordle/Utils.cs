@@ -123,5 +123,6 @@ namespace StardewWordle
         public static string STREAK_LOST = "StardewWordle_StreakLost";
         public static string GAME_AVAILABLE = "StardewWordle_GameAvailable";
         public static string MODE_SYNC = "StardewWordle_ModeSync";
+        public static string PLAY_ANIM = "StardewWordle_PlayAnim";
     }
 }

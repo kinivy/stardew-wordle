@@ -223,11 +223,22 @@ namespace StardewWordle
                         saveModel.handleWin();
                         int reward = determineReward();
                         Game1.player.addUnearnedMoney(reward);
-                        if(Game1.player.hasQuest("kinivy_Wordle_WordleQuest") && saveModel.MaxStreak >= 4)
+                        if(Config.MultiplayerMode == MultiplayerMode.Individual)
+                        {    
+                            if(Game1.player.hasQuest("kinivy_Wordle_WordleQuest") && saveModel.MaxStreak >= 4)
+                            {
+                                Game1.player.completeQuest("kinivy_Wordle_WordleQuest");
+                                Game1.addMailForTomorrow("kinivy_Wordle_GusWordleMail");
+                            }
+                        } else
                         {
-                            Game1.player.completeQuest("kinivy_Wordle_WordleQuest");
-                            //IF SYNCHRONOUS COMPLETE FOR ALL
-                            Game1.addMailForTomorrow("kinivy_Wordle_GusWordleMail");
+                            Game1.addMailForTomorrow("kinivy_Wordle_GusWordleMail",false,true);
+                            foreach(Farmer farmer in Game1.getAllFarmers()){
+                                if(farmer.hasQuest("kinivy_Wordle_WordleQuest") && saveModel.MaxStreak >= 4)
+                                {
+                                    farmer.completeQuest("kinivy_Wordle_WordleQuest");
+                                }
+                            }
                         }
                     } else if(saveModel.Guesses.Count() == NUM_GUESSES)
                     {
@@ -237,12 +248,20 @@ namespace StardewWordle
                         {
                             Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
                         }
+                        if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
+                        {
+                            helper.Multiplayer.SendMessage("", MessageType.STREAK_LOST, modIDs: new[] { "kinivy.StardewWordle" });
+                        }
                     }
                     else
                     {
                         saveModel.Guesses.Add(""); // Start new guess
                     }
                     writeOrSyncData();
+                    if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
+                    {
+                        helper.Multiplayer.SendMessage("", MessageType.PLAY_ANIM, modIDs: new[] { "kinivy.StardewWordle" });
+                    }
 
                     if(saveModel.State != WordleState.PLAYING)
                     {
@@ -259,6 +278,12 @@ namespace StardewWordle
 
                 
             }   
+        }
+
+        public void playAnim()
+        {
+            gridAnimCount = 0;
+            gridAnimStart = TimeSpan.Zero;
         }
 
         private void updateColors()
