@@ -47,6 +47,7 @@
                 64 15/
                 farmer 64 15 2
                 Gus 64 18 0/
+                skippable/
                 pause 1000/
                 speak Gus \"Hi @! Good morning.\"/
                 pause 800/

@@ -9,6 +9,7 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using xTile.Tiles;
 using xTile.Layers;
+using System.Reflection.Metadata.Ecma335;
 namespace StardewWordle
 {
     
@@ -17,6 +18,20 @@ namespace StardewWordle
         internal static bool WordleGameAvailable = false; //used to show alert texture & UIInfoSuite icon
         private static Tile originalMachineTile;
         internal static IModHelper Helper;
+        //CachedMultiplayerMode is updated whenever the peer connects to the host or the host changes the config.
+        private static MultiplayerMode _CachedMultiplayerMode;
+        internal static MultiplayerMode MultiplayerMode
+        {
+            get
+            {
+                if(Game1.IsMasterGame) return ModEntry.Config.MultiplayerMode;
+                return _CachedMultiplayerMode;
+            }
+            set
+            {
+                _CachedMultiplayerMode = value;
+            }
+        }
 
         internal static void UpdateSaloonMachineAnimation()
         {
@@ -122,7 +137,8 @@ namespace StardewWordle
         public static string REQUEST_STATE = "StardewWordle_RequestState";
         public static string STREAK_LOST = "StardewWordle_StreakLost";
         public static string GAME_AVAILABLE = "StardewWordle_GameAvailable";
-        public static string MODE_SYNC = "StardewWordle_ModeSync";
+        public static string MP_MODE = "StardewWordle_MP_Mode";
         public static string PLAY_ANIM = "StardewWordle_PlayAnim";
+        public static string COMPLETE_STREAK_QUEST = "StardewWordle_CompleteStreakQuest";
     }
 }

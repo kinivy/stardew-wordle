@@ -58,9 +58,9 @@ namespace StardewWordle
                 {
                     saveModel = performDailyActionsOnSave(saveModel, e.Peer.PlayerID);
                 }
+                //Sending Multiplayer Mode & State
+                Helper.Multiplayer.SendMessage(Config.MultiplayerMode, MessageType.MP_MODE, modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {e.Peer.PlayerID});
                 Helper.Multiplayer.SendMessage(saveModel, MessageType.SEND_STATE, modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {e.Peer.PlayerID});
-                //Syncing Multiplayer Mode in Config
-                Helper.Multiplayer.SendMessage(Config.MultiplayerMode, MessageType.MODE_SYNC, modIDs: new[] { "kinivy.StardewWordle" });
             }
         }
 
@@ -69,14 +69,14 @@ namespace StardewWordle
             handleDayStarted();
         }
 
-        private void handleDayStarted()
+        private void handleDayStarted(bool checkStreak = true)
         {
             if (Game1.IsMasterGame)
             {
                 if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
                 {
                     WordleSaveData saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>(Utils.SaveKey());
-                    saveModel = performDailyActionsOnSave(saveModel);
+                    saveModel = performDailyActionsOnSave(saveModel,-1,checkStreak);
                     Utils.WordleGameAvailable = saveModel.IsWordleGameAvailable();
                     
                     //Send data to other players.
@@ -87,7 +87,7 @@ namespace StardewWordle
                     foreach(long id in Utils.getAllPlayerIDs())
                     {
                         WordleSaveData saveModel = this.Helper.Data.ReadSaveData<WordleSaveData>(Utils.SaveKey(id));
-                        saveModel = performDailyActionsOnSave(saveModel, id);
+                        saveModel = performDailyActionsOnSave(saveModel, id,checkStreak);
 
                         if(id == Game1.player.UniqueMultiplayerID)
                         {
@@ -101,14 +101,17 @@ namespace StardewWordle
             }
         }
 
-        private WordleSaveData performDailyActionsOnSave(WordleSaveData saveData, long saveId = -1)
+        private WordleSaveData performDailyActionsOnSave(WordleSaveData saveData, long saveId = -1, bool checkStreak = true)
         {
             if(saveData == null)
             {
                 saveData = weeklyReset(null, saveId);
             }else if(Game1.dayOfMonth % 7 == 1)
             {
-                checkIfWordleStreakBroke(saveData, saveId);
+                if (checkStreak)
+                {
+                    checkIfWordleStreakBroke(saveData, saveId);
+                }
                 saveData = weeklyReset(saveData, saveId);
             }
             return saveData;
@@ -128,7 +131,7 @@ namespace StardewWordle
             {
                 Monitor.Log("OnMessageReceived: Received State.", LogLevel.Debug);
                 WordleSaveData state = e.ReadAs<WordleSaveData>();
-                if(!(Config.MultiplayerMode == MultiplayerMode.Individual && Game1.IsMasterGame))
+                if(!(Utils.MultiplayerMode == MultiplayerMode.Individual && Game1.IsMasterGame))
                 {
                     if(Game1.activeClickableMenu != null && Game1.activeClickableMenu is WordleMenu menu)
                     {
@@ -155,10 +158,10 @@ namespace StardewWordle
             } else if(e.Type == MessageType.GAME_AVAILABLE && Config.EnableNotifications)
             {
                 Game1.addHUDMessage(new HUDMessage("A new Wordle game is available.", HUDMessage.achievement_type));
-            } else if(e.Type == MessageType.MODE_SYNC)
+            } else if(e.Type == MessageType.MP_MODE)
             {
                 MultiplayerMode mode = e.ReadAs<MultiplayerMode>();
-                Config.MultiplayerMode = mode;
+                Utils.MultiplayerMode = mode;
                 if(Game1.activeClickableMenu != null && Game1.activeClickableMenu is WordleMenu menu)
                 {
                     menu.exitThisMenu();
@@ -169,6 +172,10 @@ namespace StardewWordle
                 {
                     menu.playAnim();
                 }
+            } else if(e.Type == MessageType.COMPLETE_STREAK_QUEST && Game1.player.hasQuest("kinivy_Wordle_WordleQuest"))
+            {
+                Game1.player.completeQuest("kinivy_Wordle_WordleQuest");
+                Game1.addMailForTomorrow("kinivy_Wordle_GusWordleMail");
             }
         }
 
@@ -217,11 +224,12 @@ namespace StardewWordle
                     Enum.TryParse(value, out MultiplayerMode mode);
                     if(Config.MultiplayerMode == mode) return;
                     Config.MultiplayerMode = mode;
-                    handleDayStarted();
-                    Helper.Multiplayer.SendMessage(mode, MessageType.MODE_SYNC, modIDs: new[] { "kinivy.StardewWordle" });
+                    if(!Game1.IsMasterGame) return;
+                    handleDayStarted(checkStreak: false); //Don't lose streak when changing mode.
+                    Helper.Multiplayer.SendMessage(mode, MessageType.MP_MODE, modIDs: new[] { "kinivy.StardewWordle" });
 
                 },
-                allowedValues: new string[] { "Synchronous", "Individual"}
+                allowedValues: ["Synchronous", "Individual"]
             );
 		}
 

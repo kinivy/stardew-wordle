@@ -31,6 +31,7 @@ namespace StardewWordle
         private int TILE_WIDTH = Game1.tileSize;
         private int TILE_MARGIN = 5;  
         private WordleTheme Theme;      
+        private Texture2D StreakTexture;
         public WordleMenu(IModHelper helper, IMonitor monitor) :  base((int)getAppropriateMenuPosition().X, (int)getAppropriateMenuPosition().Y, menuWidth , menuHeight)
         {
             this.helper = helper;
@@ -47,6 +48,8 @@ namespace StardewWordle
 
                 this.saveModel = new WordleSaveData(); //placeholder until message comes back.
             }
+
+            StreakTexture = helper.GameContent.Load<Texture2D>("Characters/Monsters/Magma Sprite");
 
             this.dictionaryModel = this.helper.Data.ReadGlobalData<WordleDictionaryData>("wordle-dictionary-data");
             this.Theme = new WordleTheme(Config.DarkTheme);
@@ -223,42 +226,36 @@ namespace StardewWordle
                         saveModel.handleWin();
                         int reward = determineReward();
                         Game1.player.addUnearnedMoney(reward);
-                        if(Config.MultiplayerMode == MultiplayerMode.Individual)
-                        {    
-                            if(Game1.player.hasQuest("kinivy_Wordle_WordleQuest") && saveModel.MaxStreak >= 4)
-                            {
-                                Game1.player.completeQuest("kinivy_Wordle_WordleQuest");
-                                Game1.addMailForTomorrow("kinivy_Wordle_GusWordleMail");
-                            }
-                        } else
+
+                        if(Game1.player.hasQuest("kinivy_Wordle_WordleQuest") && saveModel.MaxStreak >= 4)
                         {
-                            Game1.addMailForTomorrow("kinivy_Wordle_GusWordleMail",false,true);
-                            foreach(Farmer farmer in Game1.getAllFarmers()){
-                                if(farmer.hasQuest("kinivy_Wordle_WordleQuest") && saveModel.MaxStreak >= 4)
-                                {
-                                    farmer.completeQuest("kinivy_Wordle_WordleQuest");
-                                }
-                            }
+                            Game1.player.completeQuest("kinivy_Wordle_WordleQuest");
+                            Game1.addMailForTomorrow("kinivy_Wordle_GusWordleMail");
+                        }
+
+                        if(Utils.MultiplayerMode == MultiplayerMode.Synchronous)
+                        {
+                            helper.Multiplayer.SendMessage("", MessageType.COMPLETE_STREAK_QUEST, modIDs: new[] { "kinivy.StardewWordle" });
                         }
                     } else if(saveModel.Guesses.Count() == NUM_GUESSES)
                     {
-                        saveModel.State = WordleState.LOST;
-                        saveModel.Streak = 0;
-                        if (Config.EnableNotifications)
-                        {
-                            Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
-                        }
-                        if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
+                        if(Utils.MultiplayerMode == MultiplayerMode.Synchronous && saveModel.Streak > 0)
                         {
                             helper.Multiplayer.SendMessage("", MessageType.STREAK_LOST, modIDs: new[] { "kinivy.StardewWordle" });
                         }
+                        if (Config.EnableNotifications && saveModel.Streak > 0)
+                        {
+                            Game1.addHUDMessage(new HUDMessage("You lost your Wordle streak.", HUDMessage.error_type));
+                        }
+                        saveModel.State = WordleState.LOST;
+                        saveModel.Streak = 0;
                     }
                     else
                     {
                         saveModel.Guesses.Add(""); // Start new guess
                     }
                     writeOrSyncData();
-                    if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
+                    if(Utils.MultiplayerMode == MultiplayerMode.Synchronous)
                     {
                         helper.Multiplayer.SendMessage("", MessageType.PLAY_ANIM, modIDs: new[] { "kinivy.StardewWordle" });
                     }
@@ -282,6 +279,7 @@ namespace StardewWordle
 
         public void playAnim()
         {
+            Game1.playSound("crit", null);
             gridAnimCount = 0;
             gridAnimStart = TimeSpan.Zero;
         }
@@ -304,13 +302,13 @@ namespace StardewWordle
             if(Game1.IsMasterGame)
             {
                 this.helper.Data.WriteSaveData(Utils.SaveKey(Game1.player.UniqueMultiplayerID), saveModel);
-            } else if(Config.MultiplayerMode == MultiplayerMode.Individual)
+            } else if(Utils.MultiplayerMode == MultiplayerMode.Individual)
             {
                 //Send individual data to host to write.
                 helper.Multiplayer.SendMessage(saveModel, MessageType.SEND_STATE, modIDs: new[] { "kinivy.StardewWordle" }, playerIDs: new[] {Utils.GetHostId()});
             }
             
-            if(Config.MultiplayerMode == MultiplayerMode.Synchronous)
+            if(Utils.MultiplayerMode == MultiplayerMode.Synchronous)
             {
                 Monitor.Log("writeOrSync: Sending state.", LogLevel.Debug);
                 helper.Multiplayer.SendMessage(saveModel, MessageType.SEND_STATE, modIDs: new[] { "kinivy.StardewWordle" });
@@ -484,13 +482,26 @@ namespace StardewWordle
             Utility.drawBoldText(b, "Not in word list", Game1.smallFont, textPos, Theme.BACKGROUND);
         }
 
+        private void drawStreak(SpriteBatch b)
+        {
+            Vector2 wordSize = Game1.dialogueFont.MeasureString(saveModel.Streak.ToString());
+
+            int XPos = (int) (this.xPositionOnScreen + this.width - wordSize.X - 25);
+            int YPos = this.yPositionOnScreen + 30;
+            Vector2 textPos = new Vector2(XPos, YPos);
+            Utility.drawBoldText(b, saveModel.Streak.ToString(), Game1.dialogueFont, textPos, Theme.HEADER_COLOR);
+            Vector2 iconPos = new Vector2(XPos-35, YPos+5);
+            b.Draw(StreakTexture, iconPos, new Rectangle(80,0,16,16),Color.White,0,Vector2.Zero,new Vector2(2,2),SpriteEffects.None,0);
+        }
+
         public override void draw(SpriteBatch b)
         {
             base.draw(b);
             drawBoxAndHeader(b);
             drawGrid(b);
             if ( inPlayingState() || (!inPlayingState() && gridAnimCount != -1))
-            {    
+            {   
+                drawStreak(b); 
                 drawKeyboard(b);
             } else if(!inPlayingState() && gridAnimCount == -1)
             {
